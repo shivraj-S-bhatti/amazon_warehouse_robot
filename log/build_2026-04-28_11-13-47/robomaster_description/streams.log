@@ -1,0 +1,178 @@
+[0.019s] Invoking command in '/home/while/robomaster_ws/build/robomaster_description': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/while/robomaster_ws/src/robomaster_ros/robomaster_description -DCMAKE_INSTALL_PREFIX=/home/while/robomaster_ws/install/robomaster_description
+[0.505s] -- The C compiler identification is GNU 11.4.0
+[1.762s] -- The CXX compiler identification is GNU 11.4.0
+[2.557s] -- Detecting C compiler ABI info
+[2.855s] -- Detecting C compiler ABI info - done
+[2.863s] -- Check for working C compiler: /usr/bin/cc - skipped
+[2.863s] -- Detecting C compile features
+[2.864s] -- Detecting C compile features - done
+[2.867s] -- Detecting CXX compiler ABI info
+[3.181s] -- Detecting CXX compiler ABI info - done
+[3.189s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[3.189s] -- Detecting CXX compile features
+[3.190s] -- Detecting CXX compile features - done
+[3.216s] -- Found ament_cmake: 1.3.14 (/opt/ros/humble/share/ament_cmake/cmake)
+[3.650s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[3.783s] -- Found ament_lint_auto: 0.12.15 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[3.885s] -- Added test 'copyright' to check source files copyright and LICENSE
+[3.895s] -- Added test 'flake8' to check Python code syntax and style conventions
+[3.897s] -- Added test 'lint_cmake' to check CMake code style
+[3.899s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[3.904s] -- Added test 'xmllint' to check XML markup files
+[3.907s] -- Configuring done
+[3.912s] -- Generating done
+[3.915s] -- Build files have been written to: /home/while/robomaster_ws/build/robomaster_description
+[3.921s] Invoked command in '/home/while/robomaster_ws/build/robomaster_description' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/while/robomaster_ws/src/robomaster_ros/robomaster_description -DCMAKE_INSTALL_PREFIX=/home/while/robomaster_ws/install/robomaster_description
+[3.921s] Invoking command in '/home/while/robomaster_ws/build/robomaster_description': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/while/robomaster_ws/build/robomaster_description -- -j16 -l16
+[3.960s] Invoked command in '/home/while/robomaster_ws/build/robomaster_description' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/while/robomaster_ws/build/robomaster_description -- -j16 -l16
+[3.971s] Invoking command in '/home/while/robomaster_ws/build/robomaster_description': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/while/robomaster_ws/build/robomaster_description
+[3.978s] -- Install configuration: ""
+[3.978s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf
+[3.979s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/robomaster_s1.urdf.xacro
+[3.979s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/gripper.urdf.xacro
+[3.980s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/camera.urdf.xacro
+[3.980s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/intelligent_controller.urdf.xacro
+[3.980s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/robomaster_ep.urdf.xacro
+[3.980s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/arm.urdf.xacro
+[3.980s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/base.urdf.xacro
+[3.981s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/extension.urdf.xacro
+[3.981s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/led.urdf.xacro
+[3.981s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/tof.urdf.xacro
+[3.981s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/gimbal.urdf.xacro
+[3.981s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/urdf/wheel.urdf.xacro
+[3.982s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/launch
+[3.982s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/launch/model.launch.py
+[3.982s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/launch/main.launch
+[3.982s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes
+[3.983s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_gripper_2_collision.dae
+[3.983s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_left_led.dae
+[3.983s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_left_led_3.dae
+[3.983s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/chassis.dae
+[3.987s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/arm_base.dae
+[3.987s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/extension_base.dae
+[3.988s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/front_right_wheel.dae
+[3.988s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/battery_pin_left.dae
+[3.988s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_servo.dae
+[3.989s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_base.dae
+[3.989s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/front_led.dae
+[3.989s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_base_collision.dae
+[3.989s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/left_led.dae
+[3.990s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_right_led_4.dae
+[3.990s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_right_led.dae
+[3.990s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_left_6.dae
+[3.990s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_left_2.dae
+[3.990s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_base.dae
+[3.990s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/EP_all_01_b.png
+[3.991s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_left_6_collision.dae
+[3.991s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/blaster_gun_collision.dae
+[3.991s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_gripper_7.dae
+[3.992s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/blaster_magazin_collision.dae
+[3.992s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/wheel.dae
+[3.992s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_gripper_6_collision.dae
+[3.992s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_gripper_7_collision.dae
+[3.993s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/wifi_antenna_right.dae
+[3.993s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_left_led_5.dae
+[3.993s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_right_led_2.dae
+[3.993s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_left_led_1.dae
+[3.993s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/endpoint_bracket_collision.dae
+[3.993s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/blaster_magazin.dae
+[3.994s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/armor.dae
+[3.994s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_right_led_6.dae
+[3.994s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rod_1_collision.dae
+[3.994s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/intelligent_controller.dae
+[3.994s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_gripper_5_collision.dae
+[3.995s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_right_led_7.dae
+[3.995s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/controller.dae
+[3.995s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/battery.dae
+[3.995s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_left_led_4.dae
+[3.996s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_hit_sensor.dae
+[3.996s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/TOP_Base_Color.png
+[3.996s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/triangle_collision.dae
+[3.996s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/arm_2_bar_1.dae
+[3.997s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/base_collision.dae
+[3.997s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rear_right_wheel.dae
+[3.997s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/extension_support.dae
+[3.997s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/speaker.dae
+[3.998s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_left_5_collision.dae
+[3.998s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/front_hit_sensor.dae
+[3.998s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rear_hit_sensor.dae
+[3.998s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal.dae
+[3.998s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/TOP_Normal_OpenGL.png
+[3.999s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/led.dae
+[4.000s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/left_hit_sensor.dae
+[4.000s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_left_2_collision.dae
+[4.000s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/arm_2.dae
+[4.000s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_side.dae
+[4.001s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_gripper_1.dae
+[4.001s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/triangle.dae
+[4.001s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/TOP_Normal_OpenGL.png.001.png
+[4.002s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/arm_2_collision.dae
+[4.002s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/blaster_top.dae
+[4.002s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_left_led_2.dae
+[4.003s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_left_led_6.dae
+[4.003s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/battery_pin_right.dae
+[4.003s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/left_servo.dae
+[4.003s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_gripper_6.dae
+[4.004s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/speaker_collision.dae
+[4.004s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/camera.dae
+[4.004s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_left_4_collision.dae
+[4.004s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/arm_1_cylinder.dae
+[4.004s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_right_led_1.dae
+[4.004s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/blaster_gun.dae
+[4.005s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_gripper_4_collision.dae
+[4.005s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_left_led_0.dae
+[4.005s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/arm_1_collision.dae
+[4.005s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/blaster_top_collision.dae
+[4.005s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/endpoint_bracket.dae
+[4.006s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_right_led_0.dae
+[4.006s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/TOP_Base_Color.png.001.png
+[4.006s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/arm_2_bar_2.dae
+[4.006s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_left_armor.dae
+[4.007s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rod_1.dae
+[4.007s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_left_led_7.dae
+[4.007s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rod.dae
+[4.007s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/front_left_wheel.dae
+[4.008s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_right_led_3.dae
+[4.008s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_led.dae
+[4.008s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rear_left_wheel.dae
+[4.008s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_right_armor.dae
+[4.009s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_left_collision.dae
+[4.009s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_base_collision.dae
+[4.009s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_gripper_4.dae
+[4.010s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_left_7.dae
+[4.010s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_gripper_5.dae
+[4.010s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/hit_sensor.dae
+[4.010s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rod_3.dae
+[4.011s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rod_3_collision.dae
+[4.011s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/right_gripper_2.dae
+[4.011s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rod_collision.dae
+[4.011s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rod_2.dae
+[4.011s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/controller_cover.dae
+[4.012s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rear_led.dae
+[4.012s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/blaster_bug.dae
+[4.012s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/rod_2_collision.dae
+[4.012s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_left_1.dae
+[4.013s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_collision.dae
+[4.013s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/arm_base_collision.dae
+[4.013s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/arm_1.dae
+[4.013s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_left_4.dae
+[4.014s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/wifi_antenna_left.dae
+[4.014s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_right_led7.dae
+[4.014s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gripper_left_5.dae
+[4.014s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/meshes/gimbal_right_led_5.dae
+[4.015s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/ament_index/resource_index/package_run_dependencies/robomaster_description
+[4.015s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/ament_index/resource_index/parent_prefix_path/robomaster_description
+[4.015s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/environment/ament_prefix_path.sh
+[4.016s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/environment/ament_prefix_path.dsv
+[4.016s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/environment/path.sh
+[4.016s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/environment/path.dsv
+[4.016s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/local_setup.bash
+[4.016s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/local_setup.sh
+[4.017s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/local_setup.zsh
+[4.017s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/local_setup.dsv
+[4.017s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/package.dsv
+[4.017s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/ament_index/resource_index/packages/robomaster_description
+[4.018s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/cmake/robomaster_descriptionConfig.cmake
+[4.018s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/cmake/robomaster_descriptionConfig-version.cmake
+[4.018s] -- Installing: /home/while/robomaster_ws/install/robomaster_description/share/robomaster_description/package.xml
+[4.020s] Invoked command in '/home/while/robomaster_ws/build/robomaster_description' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/while/robomaster_ws/build/robomaster_description
