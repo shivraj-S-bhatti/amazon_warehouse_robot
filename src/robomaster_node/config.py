@@ -60,6 +60,9 @@ DEST_APPROACH_DISTANCE = 0.20   # meters — stop this far from destination mark
 # If marker not detected for this many seconds, rotate to search
 MARKER_LOST_TIMEOUT = 3.0       # seconds
 
+# If a waypoint marker can't be found after rotating for this long, skip it
+WAYPOINT_SEARCH_TIMEOUT = 15.0  # seconds
+
 # =============================================================================
 # Obstacle Avoidance (ToF Sensor)
 # =============================================================================
@@ -99,9 +102,9 @@ ARM_PICK_Z = -0.04                 # height for picking (slightly below neutral)
 ARM_CARRY_X = 0.12                 # forward position while carrying
 ARM_CARRY_Z = 0.08                 # lifted height while carrying
 ARM_PLACE_X = 0.18                 # forward reach for placing
-ARM_PLACE_Z = -0.02                # height for placing
+ARM_PLACE_Z = 0.05                 # height for placing
 ARM_RETRACT_X = 0.09               # retracted position
-ARM_RETRACT_Z = 0.10               # retracted height
+ARM_RETRACT_Z = 0.13               # retracted height
 
 # =============================================================================
 # Gripper

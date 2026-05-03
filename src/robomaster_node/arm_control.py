@@ -123,6 +123,10 @@ class ArmController(Node):
         result_future = goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, result_future, timeout_sec=10.0)
 
+        if not result_future.done():
+            self.get_logger().warn('Arm movement timed out!')
+            return False
+
         # Small delay for arm to settle
         time.sleep(ARM_WAIT_TIME)
 
@@ -167,6 +171,10 @@ class ArmController(Node):
         # Wait for result
         result_future = goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, result_future, timeout_sec=10.0)
+
+        if not result_future.done():
+            self.get_logger().warn('Gripper action timed out!')
+            return False
 
         # Wait for gripper to finish mechanical movement
         time.sleep(GRIPPER_WAIT_TIME)
@@ -227,7 +235,9 @@ class ArmController(Node):
             return False
 
         # Step 4: Pause gripper to hold position
-        self.pause_gripper()
+        if not self.pause_gripper():
+            self.get_logger().error('Failed to pause gripper — object may not be held')
+            return False
 
         # Step 5: Lift arm to carry position
         if not self.move_arm_to(ARM_CARRY_X, ARM_CARRY_Z, relative=False):

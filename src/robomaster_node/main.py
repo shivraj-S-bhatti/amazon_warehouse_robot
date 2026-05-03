@@ -34,7 +34,7 @@ from config import (
     OBJECT_MARKER_ID, WAYPOINT_MARKER_IDS, DEST_MARKER_ID,
     # Thresholds
     APPROACH_DISTANCE, WAYPOINT_SWITCH_DISTANCE, DEST_APPROACH_DISTANCE,
-    MARKER_LOST_TIMEOUT,
+    MARKER_LOST_TIMEOUT, WAYPOINT_SEARCH_TIMEOUT,
     # Obstacle
     STRAFE_DIRECTION, STRAFE_DURATION,
     # Speeds
@@ -87,6 +87,9 @@ class StateMachine:
         self.current_waypoint_index = 0
         self.marker_last_seen_time = time.time()
         self.avoid_start_time = 0.0
+        self.avoid_nudge_count = 0
+        self.pre_avoid_state = STATE_NAVIGATE  # state to return to after avoidance
+        self.waypoint_search_start = None  # set when we begin rotating for a waypoint
         self.running = True
 
         # ── Logging ──
@@ -149,6 +152,7 @@ class StateMachine:
             time.sleep(0.5)
 
             # Fine alignment: rotate to center the marker
+            aligned = False
             for _ in range(20):
                 det = self.vision.get_marker(OBJECT_MARKER_ID)
                 if det is None:
@@ -159,14 +163,23 @@ class StateMachine:
                 time.sleep(0.1)
 
             self.chassis.stop()
+            if not aligned:
+                self.logger.warn('Fine alignment incomplete — proceeding anyway')
             return STATE_PICK_UP
 
-        # Check for obstacles
+        # Check for obstacles — skip if the "obstacle" is the target itself
         if self.obstacle.is_blocked():
-            self.logger.warn('Obstacle detected while approaching object!')
-            self.chassis.stop()
-            self.avoid_start_time = time.time()
-            return STATE_OBSTACLE_AVOID
+            tof = self.obstacle.get_distance()
+            if tof >= detection['distance'] - 0.10:
+                # ToF is reading the target object, not a real obstacle
+                pass
+            else:
+                self.logger.warn('Obstacle detected while approaching object!')
+                self.chassis.stop()
+                self.avoid_start_time = time.time()
+                self.avoid_nudge_count = 0
+                self.pre_avoid_state = STATE_APPROACH_OBJECT
+                return STATE_OBSTACLE_AVOID
 
         # Drive toward marker
         speed, angular = self.chassis.drive_toward_marker(detection)
@@ -223,12 +236,24 @@ class StateMachine:
         detection = self.vision.get_marker(current_marker_id)
 
         if detection is None:
-            # Can't see waypoint — rotate to search if timeout
             if time.time() - self.marker_last_seen_time > MARKER_LOST_TIMEOUT:
+                # Start tracking how long we've been searching for this waypoint
+                if self.waypoint_search_start is None:
+                    self.waypoint_search_start = time.time()
+
+                # Give up on this waypoint after WAYPOINT_SEARCH_TIMEOUT seconds
+                if time.time() - self.waypoint_search_start > WAYPOINT_SEARCH_TIMEOUT:
+                    self.logger.warn(
+                        f'Waypoint {current_marker_id} not found after '
+                        f'{WAYPOINT_SEARCH_TIMEOUT:.0f}s — skipping to destination search')
+                    self.waypoint_search_start = None
+                    return STATE_SEARCH_DEST
+
                 self.chassis.rotate(SEARCH_ROTATE_SPEED)
             return STATE_NAVIGATE
 
         self.marker_last_seen_time = time.time()
+        self.waypoint_search_start = None  # marker found, reset search timer
 
         # Close enough to switch to next waypoint
         if detection['distance'] < WAYPOINT_SWITCH_DISTANCE:
@@ -251,6 +276,8 @@ class StateMachine:
                 f'Obstacle at {self.obstacle.get_distance():.2f}m!')
             self.chassis.stop()
             self.avoid_start_time = time.time()
+            self.avoid_nudge_count = 0
+            self.pre_avoid_state = STATE_NAVIGATE
             return STATE_OBSTACLE_AVOID
 
         # Navigate toward waypoint
@@ -270,19 +297,28 @@ class StateMachine:
 
         # Check if path is clear
         if self.obstacle.is_clear():
-            self.logger.info('Path clear — resuming navigation')
+            self.logger.info(f'Path clear — returning to {self.pre_avoid_state}')
             self.chassis.stop()
             time.sleep(0.3)
             self.marker_last_seen_time = time.time()
-            return STATE_NAVIGATE
+            return self.pre_avoid_state
 
         # Timeout: strafed too long without clearing
         elapsed = time.time() - self.avoid_start_time
         if elapsed > STRAFE_DURATION * 3:
-            self.logger.warn('Extended avoidance — trying forward nudge')
+            if self.avoid_nudge_count >= 3:
+                self.logger.warn('Obstacle not clearing after 3 nudges — resuming')
+                self.avoid_nudge_count = 0
+                self.chassis.stop()
+                self.marker_last_seen_time = time.time()
+                return self.pre_avoid_state
+            self.logger.warn(
+                f'Extended avoidance — trying forward nudge '
+                f'({self.avoid_nudge_count + 1}/3)')
             self.chassis.move_forward(0.1)
             time.sleep(0.5)
             self.chassis.stop()
+            self.avoid_nudge_count += 1
             self.avoid_start_time = time.time()
             return STATE_OBSTACLE_AVOID
 
@@ -340,6 +376,7 @@ class StateMachine:
             time.sleep(0.5)
 
             # Fine alignment
+            aligned = False
             for _ in range(20):
                 det = self.vision.get_marker(DEST_MARKER_ID)
                 if det is None:
@@ -350,14 +387,22 @@ class StateMachine:
                 time.sleep(0.1)
 
             self.chassis.stop()
+            if not aligned:
+                self.logger.warn('Fine alignment incomplete — proceeding anyway')
             return STATE_PLACE
 
-        # Check for obstacles
+        # Check for obstacles — skip if the "obstacle" is the destination itself
         if self.obstacle.is_blocked():
-            self.logger.warn('Obstacle on approach to destination!')
-            self.chassis.stop()
-            self.avoid_start_time = time.time()
-            return STATE_OBSTACLE_AVOID
+            tof = self.obstacle.get_distance()
+            if tof >= detection['distance'] - 0.10:
+                pass  # ToF is reading the destination marker, not a real obstacle
+            else:
+                self.logger.warn('Obstacle on approach to destination!')
+                self.chassis.stop()
+                self.avoid_start_time = time.time()
+                self.avoid_nudge_count = 0
+                self.pre_avoid_state = STATE_APPROACH_DEST
+                return STATE_OBSTACLE_AVOID
 
         self.chassis.drive_toward_marker(detection)
         return STATE_APPROACH_DEST

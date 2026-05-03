@@ -47,15 +47,15 @@ class ArmGripperTest(Node):
         self.get_logger().info(f'Gripper -> {state_name} (power={power})')
 
         future = self._gripper_client.send_goal_async(goal)
-        rclpy.spin_until_future_complete(self, future)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
         goal_handle = future.result()
 
-        if not goal_handle.accepted:
+        if goal_handle is None or not goal_handle.accepted:
             self.get_logger().error('Gripper goal rejected')
             return False
 
         result_future = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, result_future)
+        rclpy.spin_until_future_complete(self, result_future, timeout_sec=10.0)
         self.get_logger().info('Gripper done')
         return True
 
@@ -79,15 +79,15 @@ class ArmGripperTest(Node):
         self.get_logger().info(f'Arm move ({label}): x={x:.3f} m, z={z:.3f} m')
 
         future = self._arm_client.send_goal_async(goal)
-        rclpy.spin_until_future_complete(self, future)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
         goal_handle = future.result()
 
-        if not goal_handle.accepted:
+        if goal_handle is None or not goal_handle.accepted:
             self.get_logger().error('Arm goal rejected (another action may be running)')
             return False
 
         result_future = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, result_future)
+        rclpy.spin_until_future_complete(self, result_future, timeout_sec=10.0)
         self.get_logger().info('Arm move done')
         return True
 

@@ -61,7 +61,9 @@ class ObstacleNode(Node):
         distance = msg.range
 
         # ToF sensor may return -1 or 0 for invalid readings
-        if distance < 0.0 or distance > msg.max_range:
+        if distance < 0.0:
+            return
+        if msg.max_range > 0.0 and distance > msg.max_range:
             return
 
         with self.lock:
