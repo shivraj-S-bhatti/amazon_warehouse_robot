@@ -61,7 +61,7 @@ DEST_APPROACH_DISTANCE = 0.20   # meters — stop this far from destination mark
 MARKER_LOST_TIMEOUT = 3.0       # seconds
 
 # If a waypoint marker can't be found after rotating for this long, skip it
-WAYPOINT_SEARCH_TIMEOUT = 15.0  # seconds
+WAYPOINT_SEARCH_TIMEOUT = 35.0  # seconds
 
 # =============================================================================
 # Obstacle Avoidance (ToF Sensor)
@@ -85,7 +85,7 @@ NAVIGATE_SPEED = 0.25               # m/s — forward speed between waypoints
 # Visual Servoing Gains
 # =============================================================================
 # Proportional gain for steering toward marker center
-STEER_KP = 1.5                     # angular.z = KP * lateral_error
+STEER_KP = 0.8                     # angular.z = KP * lateral_error
 
 # Proportional gain for speed based on distance
 SPEED_KP = 0.5                     # linear.x = KP * distance (clamped)
@@ -98,9 +98,9 @@ STEER_DEADZONE = 0.02              # meters
 # =============================================================================
 # These need tuning on the real robot!
 ARM_PICK_X = 0.18                  # forward reach for picking
-ARM_PICK_Z = -0.04                 # height for picking (slightly below neutral)
-ARM_CARRY_X = 0.12                 # forward position while carrying
-ARM_CARRY_Z = 0.08                 # lifted height while carrying
+ARM_PICK_Z = 0.00                 # height for picking (slightly below neutral)
+ARM_CARRY_X = 0.09                 # forward position while carrying
+ARM_CARRY_Z = 0.13                 # lifted height while carrying (match retract to keep camera level)
 ARM_PLACE_X = 0.18                 # forward reach for placing
 ARM_PLACE_Z = 0.05                 # height for placing
 ARM_RETRACT_X = 0.09               # retracted position

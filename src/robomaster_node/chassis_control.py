@@ -155,17 +155,17 @@ class ChassisController(Node):
         else:
             angular_z = -STEER_KP * lateral
 
-        # Clamp angular speed to avoid wild spinning
-        angular_z = max(-1.0, min(1.0, angular_z))
+        # Clamp angular speed
+        angular_z = max(-0.5, min(0.5, angular_z))
 
         # ── Forward speed (linear.x) ──
         # Proportional to distance — slow down as we get closer
         forward_speed = SPEED_KP * distance
         forward_speed = max(APPROACH_MIN_SPEED, min(approach_speed, forward_speed))
 
-        # If we're steering hard, reduce forward speed for safety
-        if abs(angular_z) > 0.5:
-            forward_speed *= 0.5
+        # If the marker is far off-center, stop and rotate in place first
+        if abs(angular_z) > 0.3:
+            forward_speed = 0.0
 
         self.move(linear_x=forward_speed, angular_z=angular_z)
 
@@ -219,7 +219,7 @@ class ChassisController(Node):
         else:
             angular_z = -STEER_KP * lateral
 
-        angular_z = max(-0.8, min(0.8, angular_z))
+        angular_z = max(-0.5, min(0.5, angular_z))
 
         # Maintain cruising speed — only slow down when very close
         if distance < 0.5:
@@ -227,9 +227,9 @@ class ChassisController(Node):
         else:
             forward_speed = NAVIGATE_SPEED
 
-        # Reduce speed if steering hard
-        if abs(angular_z) > 0.5:
-            forward_speed *= 0.6
+        # Stop and rotate in place if the marker is far off-center
+        if abs(angular_z) > 0.3:
+            forward_speed = 0.0
 
         self.move(linear_x=forward_speed, angular_z=angular_z)
 
