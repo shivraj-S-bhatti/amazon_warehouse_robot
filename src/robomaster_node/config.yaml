@@ -1,0 +1,29 @@
+# config.yaml ¡ª RoboMaster driver configuration
+# Copy to: ~/robomaster_ws/config.yaml
+#
+# Launch with:
+#   ros2 launch robomaster_ros main.launch model:=ep conn_type:=ap \
+#     --ros-args --params-file ~/robomaster_ws/config.yaml
+
+robomaster_driver:
+  ros__parameters:
+    conn_type: "ap"
+    chassis:
+      enabled: true
+      rate: 10
+      timeout: 0.5
+    camera:
+      enabled: true
+      video:
+        raw: 1
+        resolution: 360
+    arm:
+      enabled: true
+    gripper:
+      enabled: true
+    leds:
+      enabled: true
+    battery:
+      enabled: true
+    tof:
+      enabled: true
