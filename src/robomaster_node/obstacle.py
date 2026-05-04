@@ -63,11 +63,16 @@ class ObstacleNode(Node):
         # ToF sensor may return -1 or 0 for invalid readings
         if distance < 0.0:
             return
+
+        # Match robomaster_detection avoidance_node: driver sometimes reports mm as large floats
+        if distance > 10.0:
+            distance = distance / 1000.0
+
         if msg.max_range > 0.0 and distance > msg.max_range:
             return
 
         with self.lock:
-            self._distance = distance
+            self._distance = distance if distance > 0.0 else float('inf')
             self._last_update = time.time()
             self._sensor_active = True
 

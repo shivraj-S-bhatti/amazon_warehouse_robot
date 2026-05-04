@@ -37,6 +37,9 @@ CAMERA_FY = 185.0
 CAMERA_CX = 320.0  # principal point x (image center)
 CAMERA_CY = 180.0  # principal point y (image center)
 
+# Horizontal FOV for vision-derived lateral velocity (match avoidance_node camera_hfov_deg)
+CAMERA_HFOV_DEG = 80.0
+
 # =============================================================================
 # State Machine States
 # =============================================================================
@@ -57,7 +60,8 @@ STATE_DONE = "DONE"
 APPROACH_DISTANCE = 0.40        # meters — stop this far from object marker
 WAYPOINT_SWITCH_DISTANCE = 0.60 # meters — close enough to switch to next waypoint
 DEST_APPROACH_DISTANCE = 0.20   # meters — stop this far from destination marker
-PERSON_BLOCK_AREA = 0.10        # min bounding-box area (fraction of frame) to trigger avoidance
+# Match robomaster_detection avoidance_node default reaction_area_threshold (0.05)
+PERSON_BLOCK_AREA = 0.05        # min bounding-box area (fraction of frame) to trigger avoidance
 
 # If marker not detected for this many seconds, rotate to search
 MARKER_LOST_TIMEOUT = 3.0       # seconds
@@ -92,8 +96,16 @@ STEER_KP = 1.5                     # angular.z = KP * lateral_error
 # Proportional gain for speed based on distance
 SPEED_KP = 0.5                     # linear.x = KP * distance (clamped)
 
-# Lateral error dead zone — don't steer if error is smaller than this
+# Lateral error dead zone — rotate-in-place fine align (align_to_marker)
 STEER_DEADZONE = 0.02              # meters
+
+# Two-phase marker driving (drive_toward_marker / navigate_toward_marker):
+# 1) Strafe (linear_y) until |lateral| is below tolerance — no arc, no yaw.
+# 2) Move straight forward (linear_x) with angular_z = 0.
+CENTER_STRAFE_KP = 2.0             # linear_y gain: cmd ∝ -lateral (m/s per m)
+CENTER_STRAFE_MAX = 0.2          # clamp |linear_y| during centering (m/s)
+CENTER_LATERAL_TOLERANCE = 0.03  # meters — within this, switch to forward-only
+ALIGN_CREEP_FORWARD = 0.06       # small forward while centering (0 = pure strafe)
 
 # =============================================================================
 # Arm Positions (meters, relative to arm_base_link)
@@ -144,3 +156,7 @@ BYPASS_STRAIGHT_TIME = 2.5          # seconds for the straight phase
 
 # Dynamic (moving-person) avoidance turn speed — gentler than bypass S-curve
 AVOID_TURN_SPEED     = 0.4          # rad/s while sidestepping a moving person
+# Lateral strafe during moving-person dodge (m/s); +linear_y = strafe left in chassis_control
+AVOID_STRAFE_SPEED   = 0.12
+# Below this |velocity|, use person bbox centre instead of motion direction
+AVOID_PERSON_VEL_SLOW = 0.06

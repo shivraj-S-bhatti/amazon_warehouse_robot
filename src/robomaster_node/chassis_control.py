@@ -36,6 +36,10 @@ from config import (
     STEER_KP,
     SPEED_KP,
     STEER_DEADZONE,
+    CENTER_STRAFE_KP,
+    CENTER_STRAFE_MAX,
+    CENTER_LATERAL_TOLERANCE,
+    ALIGN_CREEP_FORWARD,
     LED_SEARCHING,
     LED_APPROACHING,
     LED_PICKING,
@@ -128,10 +132,8 @@ class ChassisController(Node):
 
     def drive_toward_marker(self, detection, approach_speed=None):
         """
-        Drive toward a detected ArUco marker using proportional control.
-
-        Uses the marker's lateral offset to steer and distance to
-        control forward speed.
+        Two-phase approach: holonomic strafe until the marker is centered
+        (|lateral| small), then drive straight forward with no yaw.
 
         Args:
             detection (dict): Detection from VisionNode.get_marker().
@@ -139,7 +141,7 @@ class ChassisController(Node):
             approach_speed (float, optional): Override max forward speed.
 
         Returns:
-            tuple: (forward_speed, angular_speed) that was commanded.
+            tuple: (linear_x, angular_z) commanded (angular is always 0 here).
         """
         if approach_speed is None:
             approach_speed = APPROACH_MAX_SPEED
@@ -147,29 +149,19 @@ class ChassisController(Node):
         lateral = detection['lateral']    # meters, + = right of center
         distance = detection['distance']  # meters ahead
 
-        # ── Steering (angular.z) ──
-        # Negative lateral means marker is left → turn left (positive angular.z)
-        # Positive lateral means marker is right → turn right (negative angular.z)
-        if abs(lateral) < STEER_DEADZONE:
-            angular_z = 0.0
-        else:
-            angular_z = -STEER_KP * lateral
+        if abs(lateral) > CENTER_LATERAL_TOLERANCE:
+            # Phase 1: slide sideways (+ optional creep) — marker right (+lateral) → strafe right (-y)
+            linear_y = -CENTER_STRAFE_KP * lateral
+            linear_y = max(-CENTER_STRAFE_MAX, min(CENTER_STRAFE_MAX, linear_y))
+            creep = max(0.0, ALIGN_CREEP_FORWARD)
+            self.move(linear_x=creep, linear_y=linear_y, angular_z=0.0)
+            return (creep, 0.0)
 
-        # Clamp angular speed to avoid wild spinning
-        angular_z = max(-1.0, min(1.0, angular_z))
-
-        # ── Forward speed (linear.x) ──
-        # Proportional to distance — slow down as we get closer
+        # Phase 2: centered — straight ahead only
         forward_speed = SPEED_KP * distance
         forward_speed = max(APPROACH_MIN_SPEED, min(approach_speed, forward_speed))
-
-        # If we're steering hard, reduce forward speed for safety
-        if abs(angular_z) > 0.5:
-            forward_speed *= 0.5
-
-        self.move(linear_x=forward_speed, angular_z=angular_z)
-
-        return (forward_speed, angular_z)
+        self.move(linear_x=forward_speed, linear_y=0.0, angular_z=0.0)
+        return (forward_speed, 0.0)
 
     def align_to_marker(self, detection):
         """
@@ -200,40 +192,32 @@ class ChassisController(Node):
 
     def navigate_toward_marker(self, detection):
         """
-        Navigate toward a waypoint marker at cruising speed.
-        Similar to drive_toward_marker but with less aggressive
-        slowdown — we don't need to stop precisely at waypoints.
+        Same two-phase behavior as drive_toward_marker: strafe to center,
+        then straight forward at navigation speed.
 
         Args:
             detection (dict): Detection from VisionNode.get_marker().
 
         Returns:
-            tuple: (forward_speed, angular_speed) that was commanded.
+            tuple: (linear_x, angular_z) commanded.
         """
         lateral = detection['lateral']
         distance = detection['distance']
 
-        # Steering
-        if abs(lateral) < STEER_DEADZONE:
-            angular_z = 0.0
-        else:
-            angular_z = -STEER_KP * lateral
+        if abs(lateral) > CENTER_LATERAL_TOLERANCE:
+            linear_y = -CENTER_STRAFE_KP * lateral
+            linear_y = max(-CENTER_STRAFE_MAX, min(CENTER_STRAFE_MAX, linear_y))
+            creep = max(0.0, ALIGN_CREEP_FORWARD)
+            self.move(linear_x=creep, linear_y=linear_y, angular_z=0.0)
+            return (creep, 0.0)
 
-        angular_z = max(-0.8, min(0.8, angular_z))
-
-        # Maintain cruising speed — only slow down when very close
         if distance < 0.5:
             forward_speed = APPROACH_MIN_SPEED + (NAVIGATE_SPEED - APPROACH_MIN_SPEED) * (distance / 0.5)
         else:
             forward_speed = NAVIGATE_SPEED
 
-        # Reduce speed if steering hard
-        if abs(angular_z) > 0.5:
-            forward_speed *= 0.6
-
-        self.move(linear_x=forward_speed, angular_z=angular_z)
-
-        return (forward_speed, angular_z)
+        self.move(linear_x=forward_speed, linear_y=0.0, angular_z=0.0)
+        return (forward_speed, 0.0)
 
     # ─────────────────────────────────────────────────────────────
     # LED control

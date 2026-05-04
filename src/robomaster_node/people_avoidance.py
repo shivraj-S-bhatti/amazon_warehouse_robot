@@ -1,12 +1,13 @@
 """
 people_avoidance.py — Person detection and movement classification.
 
-Subscribes to the RoboMaster driver's /vision topic to track people
-in the camera frame. Classifies each person as MOVING or STATIONARY
-so the state machine can decide whether to wait or bypass.
+Default ROS parameter ``people_detection_topic`` matches robomaster_detection when
+``detection_node`` is running (same feed as avoidance_node). Override with ``vision``
+to subscribe to the driver directly when ``detection_node`` is not used.
 
-This node is detection-only — it never publishes cmd_vel.
-The state machine in main.py reads the state and controls movement.
+Optional ``cmd_vel`` subscription mirrors avoidance_node ego-motion compensation.
+
+This node does not publish cmd_vel; main.py consumes get_state() / velocities.
 """
 
 import threading
@@ -17,10 +18,11 @@ from collections import deque
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Imu
 from robomaster_msgs.msg import Detection
 
-from config import CAMERA_FX  # used to convert yaw rate to pixel velocity
+from config import CAMERA_HFOV_DEG
 
 SENSOR_QOS = QoSProfile(
     reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -36,11 +38,10 @@ PERSON_STATIONARY = "STATIONARY"
 
 class PeopleAvoidanceNode(Node):
     """
-    Tracks people detected by the RoboMaster driver's vision system.
+    Tracks people from ``people_detection_topic`` (see ROS parameters).
 
-    Subscribes to /vision and monitors whether a person in the path
-    is moving or stationary. Provides get_state() for the state machine
-    to query — never touches cmd_vel.
+    Classifies MOVING vs STATIONARY for main.py; optionally listens to ``cmd_vel``
+    for commanded yaw used in lateral velocity compensation.
     """
 
     # ── Tuning constants ──────────────────────────────────────────────────
@@ -56,6 +57,13 @@ class PeopleAvoidanceNode(Node):
 
     def __init__(self):
         super().__init__('people_avoidance_node')
+
+        self.declare_parameter(
+            'people_detection_topic',
+            '/robomaster_detection_node/people',
+        )
+        self.declare_parameter('camera_hfov_deg', float(CAMERA_HFOV_DEG))
+        self.declare_parameter('use_cmd_vel_compensation', True)
 
         self.lock = threading.Lock()
 
@@ -79,11 +87,22 @@ class PeopleAvoidanceNode(Node):
         # Bypass cooldown
         self._bypass_end_time = None
 
-        self.create_subscription(Detection, 'vision', self._vision_cb, SENSOR_QOS)
+        people_topic = self.get_parameter('people_detection_topic').value
+        hfov_deg = float(self.get_parameter('camera_hfov_deg').value)
+        self._hfov_rad = np.radians(hfov_deg)
+        self._use_cmd_comp = bool(self.get_parameter('use_cmd_vel_compensation').value)
+
+        self.create_subscription(Detection, people_topic, self._vision_cb, SENSOR_QOS)
         self.create_subscription(Imu, 'imu', self._imu_cb, SENSOR_QOS)
+        if self._use_cmd_comp:
+            self.create_subscription(Twist, 'cmd_vel', self._cmd_vel_cb, 10)
+
         self.create_timer(0.1, self._update_loop)
 
-        self.get_logger().info('PeopleAvoidanceNode initialized — watching /vision for persons')
+        self.get_logger().info(
+            f'PeopleAvoidanceNode — people topic: {people_topic!r}, '
+            f'HFOV={hfov_deg}°, cmd_vel compensation={self._use_cmd_comp}'
+        )
 
     # ── Callbacks ─────────────────────────────────────────────────────────
 
@@ -121,6 +140,11 @@ class PeopleAvoidanceNode(Node):
         with self.lock:
             self._robot_yaw = msg.angular_velocity.z
 
+    def _cmd_vel_cb(self, msg: Twist):
+        """Track commanded yaw rate for ego-motion compensation (like avoidance_node)."""
+        with self.lock:
+            self._last_cmd_yaw = msg.angular.z
+
     # ── Internal helpers ──────────────────────────────────────────────────
 
     def _update_velocity(self):
@@ -133,11 +157,9 @@ class PeopleAvoidanceNode(Node):
         dt = t1 - t0
         if dt <= 0.0:
             return
-        # Match original AvoidanceNode: 80° horizontal FOV parameter
-        hfov_rad = np.radians(80.0)
         raw_vel = (cx1 - cx0) / dt
         yaw = self._robot_yaw if abs(self._robot_yaw) > 0.001 else self._last_cmd_yaw
-        compensated = raw_vel - yaw / hfov_rad
+        compensated = raw_vel - yaw / self._hfov_rad
         self._smoothed_vel = (
             self.VEL_EMA_ALPHA * compensated
             + (1.0 - self.VEL_EMA_ALPHA) * self._smoothed_vel

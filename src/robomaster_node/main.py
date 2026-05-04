@@ -42,7 +42,7 @@ from config import (
     CONTROL_LOOP_RATE,
     # People bypass / avoidance
     BYPASS_FORWARD_SPEED, BYPASS_TURN_SPEED, BYPASS_CURVE_TIME, BYPASS_STRAIGHT_TIME,
-    AVOID_TURN_SPEED,
+    AVOID_TURN_SPEED, AVOID_STRAFE_SPEED, AVOID_PERSON_VEL_SLOW,
 )
 
 from vision import VisionNode
@@ -100,6 +100,7 @@ class StateMachine:
         self.bypass_direction = 1.0       # +1 = bypass left, -1 = bypass right
         self.accumulated_yaw = 0.0        # yaw accrued during moving-person avoidance
         self._people_loop_time = time.time()
+        self._bypass_resume_state = STATE_APPROACH_OBJECT
         self.running = True
 
         # ── Logging ──
@@ -111,6 +112,60 @@ class StateMachine:
             self.executor.spin()
         except Exception:
             pass
+
+    def _moving_person_avoidance_step(self, context: str):
+        """
+        Camera-based dodge for a moving person: forward + strafe + yaw, then
+        counter-yaw recovery. Used while driving toward any ArUco target.
+
+        Returns:
+            True if this step issued a motion command (stay in current state).
+            False if caller should run ToF + normal marker driving.
+        """
+        now = time.time()
+        dt = now - self._people_loop_time
+        self._people_loop_time = now
+
+        person_state = self.people.get_state()
+        person_area = self.people.get_person_area()
+
+        if person_state == PERSON_MOVING and person_area >= PERSON_BLOCK_AREA:
+            vel = self.people.get_smoothed_velocity()
+            person_cx = self.people.get_person_cx()
+            if abs(vel) > AVOID_PERSON_VEL_SLOW:
+                angular_z = AVOID_TURN_SPEED if vel > 0 else -AVOID_TURN_SPEED
+                # Pass opposite crossing direction: vel>0 (blob→right) → strafe left (+y)
+                linear_y = -AVOID_STRAFE_SPEED if vel < 0 else AVOID_STRAFE_SPEED
+            else:
+                angular_z = AVOID_TURN_SPEED if person_cx > 0.5 else -AVOID_TURN_SPEED
+                # Person on image right → strafe left (+y); on left → strafe right (-y)
+                linear_y = AVOID_STRAFE_SPEED if person_cx > 0.5 else -AVOID_STRAFE_SPEED
+
+            self.accumulated_yaw += angular_z * dt
+            self.chassis.move(
+                linear_x=BYPASS_FORWARD_SPEED,
+                linear_y=linear_y,
+                angular_z=angular_z,
+            )
+            self.logger.info(
+                f'[{context}] Moving person (cx={person_cx:.2f}, vel={vel:+.3f}) '
+                f'— yaw={angular_z:+.2f}, strafe_y={linear_y:+.2f}, accum_yaw={self.accumulated_yaw:+.3f}'
+            )
+            return True
+
+        if abs(self.accumulated_yaw) > 0.02:
+            correction = -BYPASS_TURN_SPEED if self.accumulated_yaw > 0 else BYPASS_TURN_SPEED
+            yaw_step = correction * dt
+            if abs(self.accumulated_yaw) <= abs(yaw_step):
+                self.accumulated_yaw = 0.0
+                correction = 0.0
+            else:
+                self.accumulated_yaw += yaw_step
+            self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=correction)
+            return True
+
+        self.accumulated_yaw = 0.0
+        return False
 
     # =================================================================
     # State handlers — each returns the next state
@@ -156,44 +211,8 @@ class StateMachine:
             time.sleep(0.5)
             return STATE_PICK_UP
 
-        # ── People avoidance ──────────────────────────────────────────────
-        now = time.time()
-        dt = now - self._people_loop_time
-        self._people_loop_time = now
-
-        person_state = self.people.get_state()
-        person_area  = self.people.get_person_area()
-
-        if person_state == PERSON_MOVING and person_area >= PERSON_BLOCK_AREA:
-            vel       = self.people.get_smoothed_velocity()
-            person_cx = self.people.get_person_cx()
-            # Turn away from person's movement direction (or position if slow)
-            if abs(vel) > 0.06:
-                angular_z = AVOID_TURN_SPEED if vel > 0 else -AVOID_TURN_SPEED
-            else:
-                angular_z = AVOID_TURN_SPEED if person_cx > 0.5 else -AVOID_TURN_SPEED
-            self.accumulated_yaw += angular_z * dt
-            self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=angular_z)
-            self.logger.info(
-                f'Moving person (cx={person_cx:.2f}, vel={vel:+.3f}) '
-                f'— turning {"left" if angular_z > 0 else "right"}, '
-                f'accum_yaw={self.accumulated_yaw:+.3f}'
-            )
+        if self._moving_person_avoidance_step('approach_object'):
             return STATE_APPROACH_OBJECT
-
-        # Heading recovery — counter-rotate to undo accumulated yaw from avoidance
-        if abs(self.accumulated_yaw) > 0.02:
-            correction = -BYPASS_TURN_SPEED if self.accumulated_yaw > 0 else BYPASS_TURN_SPEED
-            yaw_step   = correction * dt
-            if abs(self.accumulated_yaw) <= abs(yaw_step):
-                self.accumulated_yaw = 0.0
-                correction = 0.0
-            else:
-                self.accumulated_yaw += yaw_step
-            self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=correction)
-            return STATE_APPROACH_OBJECT
-
-        self.accumulated_yaw = 0.0  # fully clear once back on normal approach
 
         # ── ToF obstacle check ────────────────────────────────────────────
         if self.obstacle.is_blocked():
@@ -272,6 +291,9 @@ class StateMachine:
             self.logger.info(f'Waypoint {current_marker_id} reached')
             self.current_waypoint_index += 1
             self.marker_last_seen_time = time.time()
+            return STATE_NAVIGATE
+
+        if self._moving_person_avoidance_step(f'navigate→wp{current_marker_id}'):
             return STATE_NAVIGATE
 
         # Obstacle check — stop and avoid if something is in the way
@@ -366,8 +388,8 @@ class StateMachine:
             self.chassis.stop()
             self.people.notify_bypass_complete()
             self.marker_last_seen_time = time.time()
-            self.logger.info('Bypass complete — resuming approach')
-            return STATE_APPROACH_OBJECT
+            self.logger.info('Bypass complete — resuming prior state')
+            return self._bypass_resume_state
 
         return STATE_BYPASS_OBSTACLE
 
@@ -428,6 +450,9 @@ class StateMachine:
             if not aligned:
                 self.logger.warn('Fine alignment incomplete — proceeding anyway')
             return STATE_PLACE
+
+        if self._moving_person_avoidance_step('approach_dest'):
+            return STATE_APPROACH_DEST
 
         # Check for obstacles — skip if the "obstacle" is the destination itself
         if self.obstacle.is_blocked():
