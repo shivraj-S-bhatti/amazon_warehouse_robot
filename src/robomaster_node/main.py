@@ -27,25 +27,29 @@ import signal
 from config import (
     # States
     STATE_SEARCH_OBJECT, STATE_APPROACH_OBJECT, STATE_PICK_UP,
-    STATE_NAVIGATE, STATE_OBSTACLE_AVOID,
+    STATE_NAVIGATE, STATE_OBSTACLE_AVOID, STATE_BYPASS_OBSTACLE,
     STATE_SEARCH_DEST, STATE_APPROACH_DEST, STATE_PLACE, STATE_DONE,
     # Marker IDs
     OBJECT_MARKER_ID, WAYPOINT_MARKER_IDS, DEST_MARKER_ID,
     # Thresholds
     APPROACH_DISTANCE, WAYPOINT_SWITCH_DISTANCE, DEST_APPROACH_DISTANCE,
-    MARKER_LOST_TIMEOUT, WAYPOINT_SEARCH_TIMEOUT,
+    MARKER_LOST_TIMEOUT, WAYPOINT_SEARCH_TIMEOUT, PERSON_BLOCK_AREA,
     # Obstacle
     STRAFE_DIRECTION, STRAFE_DURATION,
     # Speeds
     SEARCH_ROTATE_SPEED,
     # Timing
     CONTROL_LOOP_RATE,
+    # People bypass / avoidance
+    BYPASS_FORWARD_SPEED, BYPASS_TURN_SPEED, BYPASS_CURVE_TIME, BYPASS_STRAIGHT_TIME,
+    AVOID_TURN_SPEED,
 )
 
 from vision import VisionNode
 from obstacle import ObstacleNode
 from chassis_control import ChassisController
 from arm_control import ArmController
+from people_avoidance import PeopleAvoidanceNode, PERSON_MOVING
 
 
 
@@ -68,12 +72,14 @@ class StateMachine:
         self.obstacle = ObstacleNode()
         self.chassis = ChassisController()
         self.arm = ArmController()
+        self.people = PeopleAvoidanceNode()
 
         # ── Background executor for nodes needing callback processing ──
         self.executor = MultiThreadedExecutor(num_threads=4)
         self.executor.add_node(self.vision)
         self.executor.add_node(self.obstacle)
         self.executor.add_node(self.chassis)
+        self.executor.add_node(self.people)
         # NOTE: ArmController is NOT added here because it uses
         # rclpy.spin_until_future_complete() internally
 
@@ -90,6 +96,10 @@ class StateMachine:
         self.avoid_nudge_count = 0
         self.pre_avoid_state = STATE_NAVIGATE  # state to return to after avoidance
         self.waypoint_search_start = None  # set when we begin rotating for a waypoint
+        self.bypass_start_time = 0.0
+        self.bypass_direction = 1.0       # +1 = bypass left, -1 = bypass right
+        self.accumulated_yaw = 0.0        # yaw accrued during moving-person avoidance
+        self._people_loop_time = time.time()
         self.running = True
 
         # ── Logging ──
@@ -146,7 +156,46 @@ class StateMachine:
             time.sleep(0.5)
             return STATE_PICK_UP
 
-        # If a real obstacle is in the way (not the marker itself), stop and avoid
+        # ── People avoidance ──────────────────────────────────────────────
+        now = time.time()
+        dt = now - self._people_loop_time
+        self._people_loop_time = now
+
+        person_state = self.people.get_state()
+        person_area  = self.people.get_person_area()
+
+        if person_state == PERSON_MOVING and person_area >= PERSON_BLOCK_AREA:
+            vel       = self.people.get_smoothed_velocity()
+            person_cx = self.people.get_person_cx()
+            # Turn away from person's movement direction (or position if slow)
+            if abs(vel) > 0.06:
+                angular_z = AVOID_TURN_SPEED if vel > 0 else -AVOID_TURN_SPEED
+            else:
+                angular_z = AVOID_TURN_SPEED if person_cx > 0.5 else -AVOID_TURN_SPEED
+            self.accumulated_yaw += angular_z * dt
+            self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=angular_z)
+            self.logger.info(
+                f'Moving person (cx={person_cx:.2f}, vel={vel:+.3f}) '
+                f'— turning {"left" if angular_z > 0 else "right"}, '
+                f'accum_yaw={self.accumulated_yaw:+.3f}'
+            )
+            return STATE_APPROACH_OBJECT
+
+        # Heading recovery — counter-rotate to undo accumulated yaw from avoidance
+        if abs(self.accumulated_yaw) > 0.02:
+            correction = -BYPASS_TURN_SPEED if self.accumulated_yaw > 0 else BYPASS_TURN_SPEED
+            yaw_step   = correction * dt
+            if abs(self.accumulated_yaw) <= abs(yaw_step):
+                self.accumulated_yaw = 0.0
+                correction = 0.0
+            else:
+                self.accumulated_yaw += yaw_step
+            self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=correction)
+            return STATE_APPROACH_OBJECT
+
+        self.accumulated_yaw = 0.0  # fully clear once back on normal approach
+
+        # ── ToF obstacle check ────────────────────────────────────────────
         if self.obstacle.is_blocked():
             tof = self.obstacle.get_distance()
             if tof < detection['distance'] - 0.10:
@@ -157,6 +206,7 @@ class StateMachine:
                 self.pre_avoid_state = STATE_APPROACH_OBJECT
                 return STATE_OBSTACLE_AVOID
 
+        # ── Normal approach ───────────────────────────────────────────────
         self.chassis.drive_toward_marker(detection)
         return STATE_APPROACH_OBJECT
 
@@ -282,6 +332,45 @@ class StateMachine:
 
         return STATE_OBSTACLE_AVOID
 
+    def handle_bypass_obstacle(self):
+        """
+        BYPASS_OBSTACLE: S-curve maneuver around a stationary person.
+
+        Three phases driven by elapsed time:
+          Phase 1 — curve:     forward + turn (BYPASS_CURVE_TIME seconds)
+          Phase 2 — straight:  forward only   (BYPASS_STRAIGHT_TIME seconds)
+          Phase 3 — curve back: forward + opposite turn (BYPASS_CURVE_TIME seconds)
+
+        On completion, resets people avoidance cooldown and returns to APPROACH_OBJECT.
+        """
+        self.chassis.set_led_avoiding()
+
+        elapsed = time.time() - self.bypass_start_time
+        p1_end  = BYPASS_CURVE_TIME
+        p2_end  = p1_end + BYPASS_STRAIGHT_TIME
+        p3_end  = p2_end + BYPASS_CURVE_TIME
+
+        if elapsed < p1_end:
+            self.chassis.move(
+                linear_x=BYPASS_FORWARD_SPEED,
+                angular_z=self.bypass_direction * BYPASS_TURN_SPEED,
+            )
+        elif elapsed < p2_end:
+            self.chassis.move(linear_x=BYPASS_FORWARD_SPEED)
+        elif elapsed < p3_end:
+            self.chassis.move(
+                linear_x=BYPASS_FORWARD_SPEED,
+                angular_z=-self.bypass_direction * BYPASS_TURN_SPEED,
+            )
+        else:
+            self.chassis.stop()
+            self.people.notify_bypass_complete()
+            self.marker_last_seen_time = time.time()
+            self.logger.info('Bypass complete — resuming approach')
+            return STATE_APPROACH_OBJECT
+
+        return STATE_BYPASS_OBSTACLE
+
     def handle_search_dest(self):
         """
         SEARCH_DEST: Rotate to find the destination marker.
@@ -400,6 +489,7 @@ class StateMachine:
             STATE_PICK_UP: self.handle_pick_up,
             STATE_NAVIGATE: self.handle_navigate,
             STATE_OBSTACLE_AVOID: self.handle_obstacle_avoid,
+            STATE_BYPASS_OBSTACLE: self.handle_bypass_obstacle,
             STATE_SEARCH_DEST: self.handle_search_dest,
             STATE_APPROACH_DEST: self.handle_approach_dest,
             STATE_PLACE: self.handle_place,
@@ -444,9 +534,11 @@ class StateMachine:
                 'Set arm.enabled and gripper.enabled: true.')
             return
 
-        # Prepare arm
+        # Prepare arm and level camera
         self.logger.info('Retracting arm...')
         self.arm.retract()
+        self.logger.info('Leveling camera...')
+        self.arm.recenter_gimbal()
 
         self.logger.info('Starting! Press Ctrl+C to stop.')
         self.marker_last_seen_time = time.time()
@@ -489,6 +581,7 @@ class StateMachine:
         self.vision.destroy_node()
         self.obstacle.destroy_node()
         self.chassis.destroy_node()
+        self.people.destroy_node()
         self.arm.destroy_node()
 
 

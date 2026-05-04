@@ -17,7 +17,7 @@ Usage:
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from robomaster_msgs.action import MoveArm, GripperControl
+from robomaster_msgs.action import MoveArm, GripperControl, RecenterGimbal
 import time
 import threading
 
@@ -47,6 +47,7 @@ class ArmController(Node):
         # Action clients
         self.arm_client = ActionClient(self, MoveArm, 'move_arm')
         self.gripper_client = ActionClient(self, GripperControl, 'gripper')
+        self.gimbal_client = ActionClient(self, RecenterGimbal, 'recenter_gimbal')
 
         # Track state
         self.lock = threading.Lock()
@@ -290,6 +291,38 @@ class ArmController(Node):
     # ─────────────────────────────────────────────────────────────
     # High-level: Arm positioning helpers
     # ─────────────────────────────────────────────────────────────
+
+    def recenter_gimbal(self):
+        """
+        Level the camera by recentering the gimbal to 0° pitch/yaw.
+        Silently skips if the gimbal action server is not available
+        (requires gimbal:=True in the launch command).
+
+        Returns:
+            bool: True if gimbal was recentered, False if unavailable.
+        """
+        if not self.gimbal_client.wait_for_server(timeout_sec=2.0):
+            self.get_logger().warn(
+                'Gimbal server not available — add gimbal:=True to launch command')
+            return False
+
+        goal = RecenterGimbal.Goal()
+        goal.pitch_speed = 1.04
+        goal.yaw_speed = 1.04
+
+        future = self.gimbal_client.send_goal_async(goal)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
+        goal_handle = future.result()
+
+        if goal_handle is None or not goal_handle.accepted:
+            self.get_logger().warn('Gimbal recenter goal rejected')
+            return False
+
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self, result_future, timeout_sec=10.0)
+
+        self.get_logger().info('Gimbal recentered — camera now level')
+        return True
 
     def carry_position(self):
         """Move arm to the carry position (lifted, out of camera view)."""

@@ -15,7 +15,7 @@ WAYPOINT_MARKER_IDS = [1, 2, 3, 4]  # Markers along the route, in order
 DEST_MARKER_ID = 10             # Marker at destination Point B
 
 ARUCO_DICT_TYPE = "DICT_4X4_50"  # Small dictionary, fast detection
-MARKER_SIZE = 0.08              # Physical marker side length in meters (8cm)
+MARKER_SIZE = 0.32              # Physical marker side length in meters (8cm)
 
 # =============================================================================
 # Camera Parameters
@@ -45,6 +45,7 @@ STATE_APPROACH_OBJECT = "APPROACH_OBJECT"
 STATE_PICK_UP = "PICK_UP"
 STATE_NAVIGATE = "NAVIGATE"
 STATE_OBSTACLE_AVOID = "OBSTACLE_AVOID"
+STATE_BYPASS_OBSTACLE = "BYPASS_OBSTACLE"
 STATE_SEARCH_DEST = "SEARCH_DEST"
 STATE_APPROACH_DEST = "APPROACH_DEST"
 STATE_PLACE = "PLACE"
@@ -53,9 +54,10 @@ STATE_DONE = "DONE"
 # =============================================================================
 # Approach & Navigation Thresholds
 # =============================================================================
-APPROACH_DISTANCE = 0.20        # meters — stop this far from object marker
+APPROACH_DISTANCE = 0.40        # meters — stop this far from object marker
 WAYPOINT_SWITCH_DISTANCE = 0.60 # meters — close enough to switch to next waypoint
 DEST_APPROACH_DISTANCE = 0.20   # meters — stop this far from destination marker
+PERSON_BLOCK_AREA = 0.10        # min bounding-box area (fraction of frame) to trigger avoidance
 
 # If marker not detected for this many seconds, rotate to search
 MARKER_LOST_TIMEOUT = 3.0       # seconds
@@ -98,14 +100,14 @@ STEER_DEADZONE = 0.02              # meters
 # =============================================================================
 # These need tuning on the real robot!
 ARM_PICK_X = 0.15                  # forward reach for picking
-ARM_PICK_Z = 0.10                # absolute height floor (hardware limit)
-ARM_PICK_LOWER = -0.00           # relative drop from floor to reach object (negative = down)
+ARM_PICK_Z = 0.10             # absolute height floor (hardware limit)
+ARM_PICK_LOWER = 0.10           # relative drop from floor to reach object (negative = down)
 ARM_CARRY_X = 0.09                 # forward position while carrying
-ARM_CARRY_Z = 0.7                 # lifted height while carrying (match retract to keep camera level)
+ARM_CARRY_Z = 0.07                 # lifted height while carrying (match retract to keep camera level)
 ARM_PLACE_X = 0.18                 # forward reach for placing
 ARM_PLACE_Z = 0.05                 # height for placing
 ARM_RETRACT_X = 0.09               # retracted position
-ARM_RETRACT_Z = 0.13               # retracted height
+ARM_RETRACT_Z = 0.10               # retracted height (lowered for better camera angle)
 
 # =============================================================================
 # Gripper
@@ -131,3 +133,14 @@ LED_DONE = (0.0, 1.0, 0.0, 1.0)         # Green — task complete
 CONTROL_LOOP_RATE = 10              # Hz — main control loop frequency
 GRIPPER_WAIT_TIME = 1.5             # seconds — wait after gripper command
 ARM_WAIT_TIME = 1.0                 # seconds — wait after arm movement
+
+# =============================================================================
+# People Bypass (S-curve maneuver around a stationary person)
+# =============================================================================
+BYPASS_FORWARD_SPEED = 0.2          # m/s during all bypass phases
+BYPASS_TURN_SPEED    = 0.8          # rad/s during S-curve bypass phases
+BYPASS_CURVE_TIME    = 1.5          # seconds for each curve phase
+BYPASS_STRAIGHT_TIME = 2.5          # seconds for the straight phase
+
+# Dynamic (moving-person) avoidance turn speed — gentler than bypass S-curve
+AVOID_TURN_SPEED     = 0.4          # rad/s while sidestepping a moving person
