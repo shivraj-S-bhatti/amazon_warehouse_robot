@@ -1,4 +1,3 @@
-
 """
 vision.py — ArUco marker detection and pose estimation.
 
@@ -118,16 +117,21 @@ class VisionNode(Node):
                 # Estimate pose: get translation and rotation vectors
                 # estimatePoseSingleMarkers removed in OpenCV 4.7+; use solvePnP instead
                 half = self.marker_size / 2.0
-                obj_pts = np.array([
-                    [-half,  half, 0],
-                    [ half,  half, 0],
-                    [ half, -half, 0],
-                    [-half, -half, 0],
-                ], dtype=np.float32)
+                obj_pts = np.array(
+                    [
+                        [-half, half, 0],
+                        [half, half, 0],
+                        [half, -half, 0],
+                        [-half, -half, 0],
+                    ],
+                    dtype=np.float32,
+                )
                 img_pts = corners[i][0].astype(np.float32)
                 _, rvec, tvec = cv2.solvePnP(
-                    obj_pts, img_pts,
-                    self.camera_matrix, self.dist_coeffs,
+                    obj_pts,
+                    img_pts,
+                    self.camera_matrix,
+                    self.dist_coeffs,
                     flags=cv2.SOLVEPNP_IPPE_SQUARE,
                 )
                 tx, ty, tz = tvec.flatten()

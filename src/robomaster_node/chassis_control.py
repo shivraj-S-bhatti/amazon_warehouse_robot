@@ -36,6 +36,7 @@ from config import (
     STEER_KP,
     SPEED_KP,
     STEER_DEADZONE,
+    STRAFE_CENTER_DEADZONE,
     LED_SEARCHING,
     LED_APPROACHING,
     LED_PICKING,
@@ -170,6 +171,28 @@ class ChassisController(Node):
         self.move(linear_x=forward_speed, angular_z=angular_z)
 
         return (forward_speed, angular_z)
+
+    def strafe_to_center_marker(self, detection):
+        """
+        Strafe sideways (no forward motion, no yaw) to centre the marker
+        horizontally in the camera frame.
+
+        Args:
+            detection (dict): Detection from VisionNode.get_marker().
+
+        Returns:
+            bool: True when the marker is within STRAFE_CENTER_DEADZONE.
+        """
+        h_err = detection['horizontal_error']  # -1 (left) to +1 (right)
+
+        if abs(h_err) <= STRAFE_CENTER_DEADZONE:
+            self.stop()
+            return True
+
+        # marker right (h_err > 0) → strafe right (negative linear_y)
+        linear_y = max(-STRAFE_SPEED, min(STRAFE_SPEED, -h_err * STRAFE_SPEED))
+        self.move(linear_x=0.0, linear_y=linear_y, angular_z=0.0)
+        return False
 
     def align_to_marker(self, detection):
         """

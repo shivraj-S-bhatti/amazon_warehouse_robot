@@ -22,11 +22,17 @@ import time
 import threading
 
 from config import (
-    ARM_PICK_X, ARM_PICK_Z,
-    ARM_CARRY_X, ARM_CARRY_Z,
-    ARM_PLACE_X, ARM_PLACE_Z,
-    ARM_RETRACT_X, ARM_RETRACT_Z,
-    GRIPPER_OPEN, GRIPPER_CLOSE, GRIPPER_PAUSE,
+    ARM_PICK_X,
+    ARM_PICK_Z,
+    ARM_CARRY_X,
+    ARM_CARRY_Z,
+    ARM_PLACE_X,
+    ARM_PLACE_Z,
+    ARM_RETRACT_X,
+    ARM_RETRACT_Z,
+    GRIPPER_OPEN,
+    GRIPPER_CLOSE,
+    GRIPPER_PAUSE,
     GRIPPER_POWER,
     GRIPPER_WAIT_TIME,
     ARM_WAIT_TIME,
@@ -42,19 +48,19 @@ class ArmController(Node):
     """
 
     def __init__(self):
-        super().__init__('arm_controller')
+        super().__init__("arm_controller")
 
         # Action clients
-        self.arm_client = ActionClient(self, MoveArm, 'move_arm')
-        self.gripper_client = ActionClient(self, GripperControl, 'gripper')
-        self.gimbal_client = ActionClient(self, RecenterGimbal, 'recenter_gimbal')
+        self.arm_client = ActionClient(self, MoveArm, "move_arm")
+        self.gripper_client = ActionClient(self, GripperControl, "gripper")
+        self.gimbal_client = ActionClient(self, RecenterGimbal, "recenter_gimbal")
 
         # Track state
         self.lock = threading.Lock()
         self._gripper_state = None  # 0=PAUSE, 1=OPEN, 2=CLOSE
         self._is_carrying = False
 
-        self.get_logger().info('ArmController initialized')
+        self.get_logger().info("ArmController initialized")
 
     # ─────────────────────────────────────────────────────────────
     # Wait for action servers to come online
@@ -68,19 +74,19 @@ class ArmController(Node):
         Returns:
             bool: True if both servers are ready.
         """
-        self.get_logger().info('Waiting for arm action server...')
+        self.get_logger().info("Waiting for arm action server...")
         arm_ready = self.arm_client.wait_for_server(timeout_sec=timeout_sec)
         if not arm_ready:
-            self.get_logger().error('Arm action server not available!')
+            self.get_logger().error("Arm action server not available!")
             return False
 
-        self.get_logger().info('Waiting for gripper action server...')
+        self.get_logger().info("Waiting for gripper action server...")
         grip_ready = self.gripper_client.wait_for_server(timeout_sec=timeout_sec)
         if not grip_ready:
-            self.get_logger().error('Gripper action server not available!')
+            self.get_logger().error("Gripper action server not available!")
             return False
 
-        self.get_logger().info('Arm and gripper action servers ready!')
+        self.get_logger().info("Arm and gripper action servers ready!")
         return True
 
     # ─────────────────────────────────────────────────────────────
@@ -106,8 +112,7 @@ class ArmController(Node):
         goal.relative = relative
 
         mode = "relative" if relative else "absolute"
-        self.get_logger().info(
-            f'Moving arm ({mode}): x={x:.3f}, z={z:.3f}')
+        self.get_logger().info(f"Moving arm ({mode}): x={x:.3f}, z={z:.3f}")
 
         # Send goal
         future = self.arm_client.send_goal_async(goal)
@@ -117,7 +122,7 @@ class ArmController(Node):
         goal_handle = future.result()
 
         if goal_handle is None or not goal_handle.accepted:
-            self.get_logger().warn('Arm goal rejected!')
+            self.get_logger().warn("Arm goal rejected!")
             return False
 
         # Wait for result
@@ -125,13 +130,13 @@ class ArmController(Node):
         rclpy.spin_until_future_complete(self, result_future, timeout_sec=10.0)
 
         if not result_future.done():
-            self.get_logger().warn('Arm movement timed out!')
+            self.get_logger().warn("Arm movement timed out!")
             return False
 
         # Small delay for arm to settle
         time.sleep(ARM_WAIT_TIME)
 
-        self.get_logger().info('Arm movement complete')
+        self.get_logger().info("Arm movement complete")
         return True
 
     # ─────────────────────────────────────────────────────────────
@@ -152,9 +157,10 @@ class ArmController(Node):
         if power is None:
             power = GRIPPER_POWER
 
-        names = {0: 'PAUSE', 1: 'OPEN', 2: 'CLOSE'}
+        names = {0: "PAUSE", 1: "OPEN", 2: "CLOSE"}
         self.get_logger().info(
-            f'Gripper: {names.get(target_state, "?")} (power={power})')
+            f'Gripper: {names.get(target_state, "?")} (power={power})'
+        )
 
         goal = GripperControl.Goal()
         goal.target_state = target_state
@@ -166,7 +172,7 @@ class ArmController(Node):
         goal_handle = future.result()
 
         if goal_handle is None or not goal_handle.accepted:
-            self.get_logger().warn('Gripper goal rejected!')
+            self.get_logger().warn("Gripper goal rejected!")
             return False
 
         # Wait for result
@@ -174,7 +180,7 @@ class ArmController(Node):
         rclpy.spin_until_future_complete(self, result_future, timeout_sec=10.0)
 
         if not result_future.done():
-            self.get_logger().warn('Gripper action timed out!')
+            self.get_logger().warn("Gripper action timed out!")
             return False
 
         # Wait for gripper to finish mechanical movement
@@ -183,7 +189,7 @@ class ArmController(Node):
         with self.lock:
             self._gripper_state = target_state
 
-        self.get_logger().info('Gripper action complete')
+        self.get_logger().info("Gripper action complete")
         return True
 
     def open_gripper(self, power=None):
@@ -218,37 +224,37 @@ class ArmController(Node):
         Returns:
             bool: True if all steps succeeded.
         """
-        self.get_logger().info('=== PICK UP SEQUENCE START ===')
+        self.get_logger().info("=== PICK UP SEQUENCE START ===")
 
         # Step 1: Open gripper
         if not self.open_gripper():
-            self.get_logger().error('Failed to open gripper')
+            self.get_logger().error("Failed to open gripper")
             return False
 
         # Step 2: Lower arm to pick position
         if not self.move_arm_to(ARM_PICK_X, ARM_PICK_Z, relative=False):
-            self.get_logger().error('Failed to lower arm')
+            self.get_logger().error("Failed to lower arm")
             return False
 
         # Step 3: Close gripper to grab object
         if not self.close_gripper():
-            self.get_logger().error('Failed to close gripper')
+            self.get_logger().error("Failed to close gripper")
             return False
 
         # Step 4: Pause gripper to hold position
         if not self.pause_gripper():
-            self.get_logger().error('Failed to pause gripper — object may not be held')
+            self.get_logger().error("Failed to pause gripper — object may not be held")
             return False
 
         # Step 5: Lift arm to carry position
         if not self.move_arm_to(ARM_CARRY_X, ARM_CARRY_Z, relative=False):
-            self.get_logger().error('Failed to lift arm')
+            self.get_logger().error("Failed to lift arm")
             return False
 
         with self.lock:
             self._is_carrying = True
 
-        self.get_logger().info('=== PICK UP SEQUENCE COMPLETE ===')
+        self.get_logger().info("=== PICK UP SEQUENCE COMPLETE ===")
         return True
 
     # ─────────────────────────────────────────────────────────────
@@ -265,27 +271,27 @@ class ArmController(Node):
         Returns:
             bool: True if all steps succeeded.
         """
-        self.get_logger().info('=== PLACE DOWN SEQUENCE START ===')
+        self.get_logger().info("=== PLACE DOWN SEQUENCE START ===")
 
         # Step 1: Lower arm to place position
         if not self.move_arm_to(ARM_PLACE_X, ARM_PLACE_Z, relative=False):
-            self.get_logger().error('Failed to lower arm')
+            self.get_logger().error("Failed to lower arm")
             return False
 
         # Step 2: Open gripper to release object
         if not self.open_gripper():
-            self.get_logger().error('Failed to open gripper')
+            self.get_logger().error("Failed to open gripper")
             return False
 
         # Step 3: Retract arm
         if not self.move_arm_to(ARM_RETRACT_X, ARM_RETRACT_Z, relative=False):
-            self.get_logger().error('Failed to retract arm')
+            self.get_logger().error("Failed to retract arm")
             return False
 
         with self.lock:
             self._is_carrying = False
 
-        self.get_logger().info('=== PLACE DOWN SEQUENCE COMPLETE ===')
+        self.get_logger().info("=== PLACE DOWN SEQUENCE COMPLETE ===")
         return True
 
     # ─────────────────────────────────────────────────────────────
@@ -303,7 +309,8 @@ class ArmController(Node):
         """
         if not self.gimbal_client.wait_for_server(timeout_sec=2.0):
             self.get_logger().warn(
-                'Gimbal server not available — add gimbal:=True to launch command')
+                "Gimbal server not available — add gimbal:=True to launch command"
+            )
             return False
 
         goal = RecenterGimbal.Goal()
@@ -315,13 +322,13 @@ class ArmController(Node):
         goal_handle = future.result()
 
         if goal_handle is None or not goal_handle.accepted:
-            self.get_logger().warn('Gimbal recenter goal rejected')
+            self.get_logger().warn("Gimbal recenter goal rejected")
             return False
 
         result_future = goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, result_future, timeout_sec=10.0)
 
-        self.get_logger().info('Gimbal recentered — camera now level')
+        self.get_logger().info("Gimbal recentered — camera now level")
         return True
 
     def carry_position(self):
@@ -359,23 +366,23 @@ def main():
 
     try:
         if not node.wait_for_servers():
-            node.get_logger().error('Action servers not available — exiting')
+            node.get_logger().error("Action servers not available — exiting")
             return
 
-        node.get_logger().info('Starting arm test in 3 seconds...')
+        node.get_logger().info("Starting arm test in 3 seconds...")
         time.sleep(3)
 
         # Test pick sequence
-        node.get_logger().info('Testing pick-up sequence...')
+        node.get_logger().info("Testing pick-up sequence...")
         node.pick_up()
 
         time.sleep(2)
 
         # Test place sequence
-        node.get_logger().info('Testing place-down sequence...')
+        node.get_logger().info("Testing place-down sequence...")
         node.place_down()
 
-        node.get_logger().info('Arm test complete!')
+        node.get_logger().info("Arm test complete!")
 
     except KeyboardInterrupt:
         pass
@@ -385,5 +392,5 @@ def main():
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

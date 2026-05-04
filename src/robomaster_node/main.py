@@ -17,6 +17,7 @@ Usage:
     cd ~/robomaster_ws/my_project
     python3 main.py
 """
+
 import sys
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
@@ -26,22 +27,41 @@ import signal
 
 from config import (
     # States
-    STATE_SEARCH_OBJECT, STATE_APPROACH_OBJECT, STATE_PICK_UP,
-    STATE_NAVIGATE, STATE_OBSTACLE_AVOID, STATE_BYPASS_OBSTACLE,
-    STATE_SEARCH_DEST, STATE_APPROACH_DEST, STATE_PLACE, STATE_DONE,
+    STATE_SEARCH_OBJECT,
+    STATE_APPROACH_OBJECT,
+    STATE_PICK_UP,
+    STATE_NAVIGATE,
+    STATE_OBSTACLE_AVOID,
+    STATE_BYPASS_OBSTACLE,
+    STATE_SEARCH_DEST,
+    STATE_APPROACH_DEST,
+    STATE_PLACE,
+    STATE_DONE,
     # Marker IDs
-    OBJECT_MARKER_ID, WAYPOINT_MARKER_IDS, DEST_MARKER_ID,
+    OBJECT_MARKER_ID,
+    WAYPOINT_MARKER_IDS,
+    DEST_MARKER_ID,
     # Thresholds
-    APPROACH_DISTANCE, WAYPOINT_SWITCH_DISTANCE, DEST_APPROACH_DISTANCE,
-    MARKER_LOST_TIMEOUT, WAYPOINT_SEARCH_TIMEOUT, PERSON_BLOCK_AREA,
+    APPROACH_DISTANCE,
+    WAYPOINT_SWITCH_DISTANCE,
+    DEST_APPROACH_DISTANCE,
+    MARKER_LOST_TIMEOUT,
+    WAYPOINT_SEARCH_TIMEOUT,
+    PERSON_BLOCK_AREA,
     # Obstacle
-    STRAFE_DIRECTION, STRAFE_DURATION,
+    STRAFE_DIRECTION,
+    STRAFE_DURATION,
     # Speeds
     SEARCH_ROTATE_SPEED,
     # Timing
     CONTROL_LOOP_RATE,
+    # Pre-approach centering
+    MARKER_CENTER_TIMEOUT,
     # People bypass / avoidance
-    BYPASS_FORWARD_SPEED, BYPASS_TURN_SPEED, BYPASS_CURVE_TIME, BYPASS_STRAIGHT_TIME,
+    BYPASS_FORWARD_SPEED,
+    BYPASS_TURN_SPEED,
+    BYPASS_CURVE_TIME,
+    BYPASS_STRAIGHT_TIME,
     AVOID_TURN_SPEED,
 )
 
@@ -50,7 +70,6 @@ from obstacle import ObstacleNode
 from chassis_control import ChassisController
 from arm_control import ArmController
 from people_avoidance import PeopleAvoidanceNode, PERSON_MOVING
-
 
 
 class StateMachine:
@@ -84,8 +103,7 @@ class StateMachine:
         # rclpy.spin_until_future_complete() internally
 
         # Start background spinning
-        self.spin_thread = threading.Thread(
-            target=self._spin_executor, daemon=True)
+        self.spin_thread = threading.Thread(target=self._spin_executor, daemon=True)
         self.spin_thread.start()
 
         # ── State machine variables ──
@@ -97,14 +115,16 @@ class StateMachine:
         self.pre_avoid_state = STATE_NAVIGATE  # state to return to after avoidance
         self.waypoint_search_start = None  # set when we begin rotating for a waypoint
         self.bypass_start_time = 0.0
-        self.bypass_direction = 1.0       # +1 = bypass left, -1 = bypass right
-        self.accumulated_yaw = 0.0        # yaw accrued during moving-person avoidance
+        self.bypass_direction = 1.0  # +1 = bypass left, -1 = bypass right
+        self.accumulated_yaw = 0.0  # yaw accrued during moving-person avoidance
         self._people_loop_time = time.time()
+        self._approach_centered = False  # True once pre-approach strafe is done
+        self._centering_start = None     # time.time() when centering began
         self.running = True
 
         # ── Logging ──
         self.logger = self.chassis.get_logger()
-    
+
     def _spin_executor(self):
         """Spin the executor in a background thread."""
         try:
@@ -126,10 +146,13 @@ class StateMachine:
 
         if detection is not None:
             self.logger.info(
-                f'Object marker {OBJECT_MARKER_ID} found at '
-                f'{detection["distance"]:.2f}m')
+                f"Object marker {OBJECT_MARKER_ID} found at "
+                f'{detection["distance"]:.2f}m'
+            )
             self.chassis.stop()
             self.marker_last_seen_time = time.time()
+            self._approach_centered = False
+            self._centering_start = None
             return STATE_APPROACH_OBJECT
 
         # Rotate slowly to search
@@ -142,16 +165,28 @@ class StateMachine:
         detection = self.vision.get_marker(OBJECT_MARKER_ID)
 
         if detection is None:
+            self.chassis.stop()
+            # While centering: use the centering clock, not MARKER_LOST_TIMEOUT.
+            # Strafing keeps the marker in-frame, but brief losses still happen;
+            # don't let the 3s lost-timeout abort centering prematurely.
+            if not self._approach_centered and self._centering_start is not None:
+                if time.time() - self._centering_start >= MARKER_CENTER_TIMEOUT:
+                    self.logger.warn("Centering timed out (marker lost) — starting approach")
+                    self._approach_centered = True
+                    self._centering_start = None
+                return STATE_APPROACH_OBJECT
+            # Normal approach: use standard lost-timeout
             if time.time() - self.marker_last_seen_time > MARKER_LOST_TIMEOUT:
-                self.logger.warn('Object marker lost — returning to search')
-                self.chassis.stop()
+                self.logger.warn("Object marker lost — returning to search")
+                self._approach_centered = False
+                self._centering_start = None
                 return STATE_SEARCH_OBJECT
             return STATE_APPROACH_OBJECT
 
         self.marker_last_seen_time = time.time()
 
-        if detection['distance'] < APPROACH_DISTANCE:
-            self.logger.info('Close enough to object — stopping to pick up')
+        if detection["distance"] < APPROACH_DISTANCE:
+            self.logger.info("Close enough to object — stopping to pick up")
             self.chassis.stop()
             time.sleep(0.5)
             return STATE_PICK_UP
@@ -162,10 +197,10 @@ class StateMachine:
         self._people_loop_time = now
 
         person_state = self.people.get_state()
-        person_area  = self.people.get_person_area()
+        person_area = self.people.get_person_area()
 
         if person_state == PERSON_MOVING and person_area >= PERSON_BLOCK_AREA:
-            vel       = self.people.get_smoothed_velocity()
+            vel = self.people.get_smoothed_velocity()
             person_cx = self.people.get_person_cx()
             # Turn away from person's movement direction (or position if slow)
             if abs(vel) > 0.06:
@@ -175,16 +210,18 @@ class StateMachine:
             self.accumulated_yaw += angular_z * dt
             self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=angular_z)
             self.logger.info(
-                f'Moving person (cx={person_cx:.2f}, vel={vel:+.3f}) '
+                f"Moving person (cx={person_cx:.2f}, vel={vel:+.3f}) "
                 f'— turning {"left" if angular_z > 0 else "right"}, '
-                f'accum_yaw={self.accumulated_yaw:+.3f}'
+                f"accum_yaw={self.accumulated_yaw:+.3f}"
             )
             return STATE_APPROACH_OBJECT
 
         # Heading recovery — counter-rotate to undo accumulated yaw from avoidance
         if abs(self.accumulated_yaw) > 0.02:
-            correction = -BYPASS_TURN_SPEED if self.accumulated_yaw > 0 else BYPASS_TURN_SPEED
-            yaw_step   = correction * dt
+            correction = (
+                -BYPASS_TURN_SPEED if self.accumulated_yaw > 0 else BYPASS_TURN_SPEED
+            )
+            yaw_step = correction * dt
             if abs(self.accumulated_yaw) <= abs(yaw_step):
                 self.accumulated_yaw = 0.0
                 correction = 0.0
@@ -198,15 +235,34 @@ class StateMachine:
         # ── ToF obstacle check ────────────────────────────────────────────
         if self.obstacle.is_blocked():
             tof = self.obstacle.get_distance()
-            if tof < detection['distance'] - 0.10:
-                self.logger.warn('Obstacle on approach to object!')
+            if tof < detection["distance"] - 0.10:
+                self.logger.warn("Obstacle on approach to object!")
                 self.chassis.stop()
                 self.avoid_start_time = time.time()
                 self.avoid_nudge_count = 0
                 self.pre_avoid_state = STATE_APPROACH_OBJECT
                 return STATE_OBSTACLE_AVOID
 
-        # ── Normal approach ───────────────────────────────────────────────
+        # ── Pre-approach strafe centering ─────────────────────────────────
+        if not self._approach_centered:
+            if self._centering_start is None:
+                self._centering_start = time.time()
+
+            centered = self.chassis.strafe_to_center_marker(detection)
+            elapsed = time.time() - self._centering_start
+
+            if centered:
+                self.logger.info("Marker centred — starting approach")
+                self._approach_centered = True
+                self._centering_start = None
+            elif elapsed >= MARKER_CENTER_TIMEOUT:
+                self.logger.warn("Centering timed out — starting best-effort approach")
+                self._approach_centered = True
+                self._centering_start = None
+
+            return STATE_APPROACH_OBJECT
+
+        # ── Normal approach (marker already centred) ──────────────────────
         self.chassis.drive_toward_marker(detection)
         return STATE_APPROACH_OBJECT
 
@@ -218,16 +274,16 @@ class StateMachine:
         self.chassis.set_led_picking()
         self.chassis.stop()
 
-        self.logger.info('Starting pick-up sequence...')
+        self.logger.info("Starting pick-up sequence...")
         success = self.arm.pick_up()
 
         if success:
-            self.logger.info('Pick-up successful! Starting navigation.')
+            self.logger.info("Pick-up successful! Starting navigation.")
             self.current_waypoint_index = 0
             self.marker_last_seen_time = time.time()
             return STATE_NAVIGATE
         else:
-            self.logger.error('Pick-up failed! Retrying search...')
+            self.logger.error("Pick-up failed! Retrying search...")
             self.arm.retract()
             return STATE_SEARCH_OBJECT
 
@@ -235,7 +291,7 @@ class StateMachine:
         self.chassis.set_led_navigating()
 
         if self.current_waypoint_index >= len(WAYPOINT_MARKER_IDS):
-            self.logger.info('All waypoints passed — searching for destination')
+            self.logger.info("All waypoints passed — searching for destination")
             return STATE_SEARCH_DEST
 
         current_marker_id = WAYPOINT_MARKER_IDS[self.current_waypoint_index]
@@ -243,7 +299,9 @@ class StateMachine:
         # Shortcut: if we can already see the destination, go straight to approach
         dest_detection = self.vision.get_marker(DEST_MARKER_ID)
         if dest_detection is not None:
-            self.logger.info('Destination marker visible — skipping remaining waypoints')
+            self.logger.info(
+                "Destination marker visible — skipping remaining waypoints"
+            )
             self.chassis.stop()
             self.marker_last_seen_time = time.time()
             return STATE_APPROACH_DEST
@@ -255,9 +313,13 @@ class StateMachine:
                 # Start rotating to search for the waypoint
                 if self.waypoint_search_start is None:
                     self.waypoint_search_start = time.time()
-                    self.logger.info(f'Waypoint {current_marker_id} lost — rotating to search')
+                    self.logger.info(
+                        f"Waypoint {current_marker_id} lost — rotating to search"
+                    )
                 elif time.time() - self.waypoint_search_start > WAYPOINT_SEARCH_TIMEOUT:
-                    self.logger.warn(f'Waypoint {current_marker_id} not found after {WAYPOINT_SEARCH_TIMEOUT}s — skipping')
+                    self.logger.warn(
+                        f"Waypoint {current_marker_id} not found after {WAYPOINT_SEARCH_TIMEOUT}s — skipping"
+                    )
                     self.current_waypoint_index += 1
                     self.waypoint_search_start = None
                     self.marker_last_seen_time = time.time()
@@ -268,15 +330,17 @@ class StateMachine:
         self.marker_last_seen_time = time.time()
         self.waypoint_search_start = None
 
-        if detection['distance'] < WAYPOINT_SWITCH_DISTANCE:
-            self.logger.info(f'Waypoint {current_marker_id} reached')
+        if detection["distance"] < WAYPOINT_SWITCH_DISTANCE:
+            self.logger.info(f"Waypoint {current_marker_id} reached")
             self.current_waypoint_index += 1
             self.marker_last_seen_time = time.time()
             return STATE_NAVIGATE
 
         # Obstacle check — stop and avoid if something is in the way
         if self.obstacle.is_blocked():
-            self.logger.warn(f'Obstacle during navigation to waypoint {current_marker_id}!')
+            self.logger.warn(
+                f"Obstacle during navigation to waypoint {current_marker_id}!"
+            )
             self.chassis.stop()
             self.avoid_start_time = time.time()
             self.avoid_nudge_count = 0
@@ -295,7 +359,7 @@ class StateMachine:
 
         # Check if path is clear
         if self.obstacle.is_clear():
-            self.logger.info(f'Path clear — returning to {self.pre_avoid_state}')
+            self.logger.info(f"Path clear — returning to {self.pre_avoid_state}")
             self.chassis.stop()
             time.sleep(0.3)
             self.marker_last_seen_time = time.time()
@@ -305,14 +369,15 @@ class StateMachine:
         elapsed = time.time() - self.avoid_start_time
         if elapsed > STRAFE_DURATION * 3:
             if self.avoid_nudge_count >= 3:
-                self.logger.warn('Obstacle not clearing after 3 nudges — resuming')
+                self.logger.warn("Obstacle not clearing after 3 nudges — resuming")
                 self.avoid_nudge_count = 0
                 self.chassis.stop()
                 self.marker_last_seen_time = time.time()
                 return self.pre_avoid_state
             self.logger.warn(
-                f'Extended avoidance — trying forward nudge '
-                f'({self.avoid_nudge_count + 1}/3)')
+                f"Extended avoidance — trying forward nudge "
+                f"({self.avoid_nudge_count + 1}/3)"
+            )
             self.chassis.move_forward(0.1)
             time.sleep(0.5)
             self.chassis.stop()
@@ -327,8 +392,9 @@ class StateMachine:
             self.chassis.strafe_right()
 
         self.logger.info(
-            f'Avoiding: ToF={self.obstacle.get_distance():.2f}m, '
-            f'strafing {"left" if STRAFE_DIRECTION > 0 else "right"}')
+            f"Avoiding: ToF={self.obstacle.get_distance():.2f}m, "
+            f'strafing {"left" if STRAFE_DIRECTION > 0 else "right"}'
+        )
 
         return STATE_OBSTACLE_AVOID
 
@@ -346,9 +412,9 @@ class StateMachine:
         self.chassis.set_led_avoiding()
 
         elapsed = time.time() - self.bypass_start_time
-        p1_end  = BYPASS_CURVE_TIME
-        p2_end  = p1_end + BYPASS_STRAIGHT_TIME
-        p3_end  = p2_end + BYPASS_CURVE_TIME
+        p1_end = BYPASS_CURVE_TIME
+        p2_end = p1_end + BYPASS_STRAIGHT_TIME
+        p3_end = p2_end + BYPASS_CURVE_TIME
 
         if elapsed < p1_end:
             self.chassis.move(
@@ -366,7 +432,7 @@ class StateMachine:
             self.chassis.stop()
             self.people.notify_bypass_complete()
             self.marker_last_seen_time = time.time()
-            self.logger.info('Bypass complete — resuming approach')
+            self.logger.info("Bypass complete — resuming approach")
             return STATE_APPROACH_OBJECT
 
         return STATE_BYPASS_OBSTACLE
@@ -381,8 +447,9 @@ class StateMachine:
 
         if detection is not None:
             self.logger.info(
-                f'Destination marker {DEST_MARKER_ID} found at '
-                f'{detection["distance"]:.2f}m')
+                f"Destination marker {DEST_MARKER_ID} found at "
+                f'{detection["distance"]:.2f}m'
+            )
             self.chassis.stop()
             self.marker_last_seen_time = time.time()
             return STATE_APPROACH_DEST
@@ -400,7 +467,7 @@ class StateMachine:
 
         if detection is None:
             if time.time() - self.marker_last_seen_time > MARKER_LOST_TIMEOUT:
-                self.logger.warn('Destination marker lost — searching')
+                self.logger.warn("Destination marker lost — searching")
                 self.chassis.stop()
                 return STATE_SEARCH_DEST
             return STATE_APPROACH_DEST
@@ -408,8 +475,8 @@ class StateMachine:
         self.marker_last_seen_time = time.time()
 
         # Close enough to place
-        if detection['distance'] < DEST_APPROACH_DISTANCE:
-            self.logger.info('At destination — stopping to place')
+        if detection["distance"] < DEST_APPROACH_DISTANCE:
+            self.logger.info("At destination — stopping to place")
             self.chassis.stop()
             time.sleep(0.5)
 
@@ -426,16 +493,16 @@ class StateMachine:
 
             self.chassis.stop()
             if not aligned:
-                self.logger.warn('Fine alignment incomplete — proceeding anyway')
+                self.logger.warn("Fine alignment incomplete — proceeding anyway")
             return STATE_PLACE
 
         # Check for obstacles — skip if the "obstacle" is the destination itself
         if self.obstacle.is_blocked():
             tof = self.obstacle.get_distance()
-            if tof >= detection['distance'] - 0.10:
+            if tof >= detection["distance"] - 0.10:
                 pass  # ToF is reading the destination marker, not a real obstacle
             else:
-                self.logger.warn('Obstacle on approach to destination!')
+                self.logger.warn("Obstacle on approach to destination!")
                 self.chassis.stop()
                 self.avoid_start_time = time.time()
                 self.avoid_nudge_count = 0
@@ -452,17 +519,17 @@ class StateMachine:
         self.chassis.set_led_picking()
         self.chassis.stop()
 
-        self.logger.info('Starting place-down sequence...')
+        self.logger.info("Starting place-down sequence...")
         success = self.arm.place_down()
 
         if success:
-            self.logger.info('Object placed successfully!')
+            self.logger.info("Object placed successfully!")
             # Back away
             self.chassis.move_backward(0.15)
             time.sleep(2.0)
             self.chassis.stop()
         else:
-            self.logger.error('Place-down failed!')
+            self.logger.error("Place-down failed!")
 
         return STATE_DONE
 
@@ -472,7 +539,7 @@ class StateMachine:
         """
         self.chassis.stop()
         self.chassis.set_led_done()
-        self.logger.info('========== TASK COMPLETE ==========')
+        self.logger.info("========== TASK COMPLETE ==========")
         self.running = False
         return STATE_DONE
 
@@ -498,49 +565,49 @@ class StateMachine:
 
         loop_period = 1.0 / CONTROL_LOOP_RATE
 
-        self.logger.info('========================================')
-        self.logger.info('  Pick-and-Transport State Machine')
-        self.logger.info('========================================')
-        self.logger.info(f'Object marker:      ID={OBJECT_MARKER_ID}')
-        self.logger.info(f'Waypoint markers:   IDs={WAYPOINT_MARKER_IDS}')
-        self.logger.info(f'Destination marker: ID={DEST_MARKER_ID}')
-        self.logger.info('========================================')
+        self.logger.info("========================================")
+        self.logger.info("  Pick-and-Transport State Machine")
+        self.logger.info("========================================")
+        self.logger.info(f"Object marker:      ID={OBJECT_MARKER_ID}")
+        self.logger.info(f"Waypoint markers:   IDs={WAYPOINT_MARKER_IDS}")
+        self.logger.info(f"Destination marker: ID={DEST_MARKER_ID}")
+        self.logger.info("========================================")
 
         # Wait for camera
-        self.logger.info('Waiting for camera frames...')
+        self.logger.info("Waiting for camera frames...")
         for _ in range(50):
             if self.vision.get_frame_count() > 0:
                 break
             time.sleep(0.1)
 
         if self.vision.get_frame_count() == 0:
-            self.logger.warn(
-                'No camera frames — is camera.enabled: true in config?')
+            self.logger.warn("No camera frames — is camera.enabled: true in config?")
         else:
-            self.logger.info(
-                f'Camera active ({self.vision.get_frame_count()} frames)')
+            self.logger.info(f"Camera active ({self.vision.get_frame_count()} frames)")
 
         # Check ToF
         if not self.obstacle.is_sensor_active():
             self.logger.warn(
-                'ToF not active — obstacle avoidance disabled. '
-                'Set tof.enabled: true in config.')
+                "ToF not active — obstacle avoidance disabled. "
+                "Set tof.enabled: true in config."
+            )
 
         # Wait for arm servers
-        self.logger.info('Waiting for arm/gripper servers...')
+        self.logger.info("Waiting for arm/gripper servers...")
         if not self.arm.wait_for_servers(timeout_sec=10.0):
             self.logger.error(
-                'Arm/gripper servers unavailable! '
-                'Set arm.enabled and gripper.enabled: true.')
+                "Arm/gripper servers unavailable! "
+                "Set arm.enabled and gripper.enabled: true."
+            )
             return
 
         # Prepare arm and level camera
-        self.logger.info('Retracting arm...')
+        self.logger.info("Retracting arm...")
         self.arm.retract()
-        self.logger.info('Leveling camera...')
+        self.logger.info("Leveling camera...")
         self.arm.recenter_gimbal()
 
-        self.logger.info('Starting! Press Ctrl+C to stop.')
+        self.logger.info("Starting! Press Ctrl+C to stop.")
         self.marker_last_seen_time = time.time()
         prev_state = None
 
@@ -549,13 +616,13 @@ class StateMachine:
 
             # Log state transitions
             if self.state != prev_state:
-                self.logger.info(f'>>> STATE: {self.state}')
+                self.logger.info(f">>> STATE: {self.state}")
                 prev_state = self.state
 
             # Execute handler
             handler = handlers.get(self.state)
             if handler is None:
-                self.logger.error(f'Unknown state: {self.state}')
+                self.logger.error(f"Unknown state: {self.state}")
                 break
 
             self.state = handler()
@@ -568,7 +635,7 @@ class StateMachine:
 
     def shutdown(self):
         """Clean shutdown."""
-        self.logger.info('Shutting down...')
+        self.logger.info("Shutting down...")
         self.running = False
         self.chassis.stop()
 
@@ -595,7 +662,7 @@ def main():
 
     # Ctrl+C handler — always stop the robot
     def signal_handler(sig, frame):
-        print('\nCtrl+C — stopping robot...')
+        print("\nCtrl+C — stopping robot...")
         sm.shutdown()
         rclpy.shutdown()
         sys.exit(0)
@@ -608,13 +675,14 @@ def main():
         pass
     except Exception as e:
         sm.chassis.stop()
-        print(f'Error: {e}')
+        print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         sm.shutdown()
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
