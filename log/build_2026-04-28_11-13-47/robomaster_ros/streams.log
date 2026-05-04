@@ -1,0 +1,148 @@
+[1.507s] Invoking command in '/home/while/robomaster_ws/src/robomaster_ros/robomaster_ros': AMENT_PREFIX_PATH=/home/while/robomaster_ws/install/robomaster_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/while/robomaster_ws/install/robomaster_msgs LD_LIBRARY_PATH=/home/while/robomaster_ws/install/robomaster_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/while/robomaster_ws/build/robomaster_ros/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages:/home/while/robomaster_ws/install/robomaster_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../../build/robomaster_ros build --build-base /home/while/robomaster_ws/build/robomaster_ros/build install --record /home/while/robomaster_ws/build/robomaster_ros/install.log --single-version-externally-managed install_data
+[1.681s] /home/while/.local/lib/python3.10/site-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+[1.682s]   warnings.warn(msg)
+[1.795s] running egg_info
+[1.812s] creating ../../../build/robomaster_ros/robomaster_ros.egg-info
+[1.813s] writing ../../../build/robomaster_ros/robomaster_ros.egg-info/PKG-INFO
+[1.813s] writing dependency_links to ../../../build/robomaster_ros/robomaster_ros.egg-info/dependency_links.txt
+[1.813s] writing entry points to ../../../build/robomaster_ros/robomaster_ros.egg-info/entry_points.txt
+[1.814s] writing requirements to ../../../build/robomaster_ros/robomaster_ros.egg-info/requires.txt
+[1.814s] writing top-level names to ../../../build/robomaster_ros/robomaster_ros.egg-info/top_level.txt
+[1.814s] writing manifest file '../../../build/robomaster_ros/robomaster_ros.egg-info/SOURCES.txt'
+[1.853s] reading manifest file '../../../build/robomaster_ros/robomaster_ros.egg-info/SOURCES.txt'
+[1.855s] writing manifest file '../../../build/robomaster_ros/robomaster_ros.egg-info/SOURCES.txt'
+[1.855s] running build
+[1.855s] running build_py
+[1.855s] creating /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.856s] copying robomaster_ros/action.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.856s] copying robomaster_ros/discover.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.857s] copying robomaster_ros/client.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.857s] copying robomaster_ros/connect.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.857s] copying robomaster_ros/decompress_h264.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.857s] copying robomaster_ros/play_audio_opus.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.857s] copying robomaster_ros/__init__.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.858s] copying robomaster_ros/display_battery.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.858s] copying robomaster_ros/play_audio.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.858s] copying robomaster_ros/robomaster_driver.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.858s] copying robomaster_ros/ftp.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.858s] copying robomaster_ros/utils.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros
+[1.859s] creating /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.859s] copying robomaster_ros/modules/speaker.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.860s] copying robomaster_ros/modules/tof.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.860s] copying robomaster_ros/modules/gimbal.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.860s] copying robomaster_ros/modules/camera.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.860s] copying robomaster_ros/modules/__init__.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.860s] copying robomaster_ros/modules/uart.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.861s] copying robomaster_ros/modules/battery.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.861s] copying robomaster_ros/modules/chassis.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.861s] copying robomaster_ros/modules/gripper.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.861s] copying robomaster_ros/modules/arm.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.861s] copying robomaster_ros/modules/armor.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.862s] copying robomaster_ros/modules/vision.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.862s] copying robomaster_ros/modules/servo.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.862s] copying robomaster_ros/modules/h264_parser.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.862s] copying robomaster_ros/modules/led.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.862s] copying robomaster_ros/modules/blaster.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.863s] copying robomaster_ros/modules/sbus.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.863s] copying robomaster_ros/modules/pwm.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.863s] copying robomaster_ros/modules/sensor_adapter.py -> /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules
+[1.864s] running install
+[1.868s] running install_lib
+[1.887s] creating /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.887s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/action.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.888s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/discover.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.888s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/client.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.888s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/connect.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.888s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/decompress_h264.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.888s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/play_audio_opus.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.888s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/__init__.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.889s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/display_battery.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.889s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/play_audio.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.889s] creating /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.889s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/speaker.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.890s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/tof.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.890s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/gimbal.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.890s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/camera.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.890s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/__init__.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.891s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/uart.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.891s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/battery.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.891s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/chassis.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.891s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/gripper.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.891s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/arm.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.891s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/armor.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.892s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/vision.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.892s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/servo.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.892s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/h264_parser.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.892s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/led.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.892s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/blaster.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.893s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/sbus.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.893s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/pwm.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.893s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/modules/sensor_adapter.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules
+[1.893s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/robomaster_driver.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.893s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/ftp.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.893s] copying /home/while/robomaster_ws/build/robomaster_ros/build/lib/robomaster_ros/utils.py -> /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros
+[1.894s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/action.py to action.cpython-310.pyc
+[1.895s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/discover.py to discover.cpython-310.pyc
+[1.896s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/client.py to client.cpython-310.pyc
+[1.898s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/connect.py to connect.cpython-310.pyc
+[1.898s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/decompress_h264.py to decompress_h264.cpython-310.pyc
+[1.899s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/play_audio_opus.py to play_audio_opus.cpython-310.pyc
+[1.900s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/__init__.py to __init__.cpython-310.pyc
+[1.900s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/display_battery.py to display_battery.cpython-310.pyc
+[1.901s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/play_audio.py to play_audio.cpython-310.pyc
+[1.901s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/speaker.py to speaker.cpython-310.pyc
+[1.903s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/tof.py to tof.cpython-310.pyc
+[1.903s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/gimbal.py to gimbal.cpython-310.pyc
+[1.905s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/camera.py to camera.cpython-310.pyc
+[1.909s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/__init__.py to __init__.cpython-310.pyc
+[1.909s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/uart.py to uart.cpython-310.pyc
+[1.910s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/battery.py to battery.cpython-310.pyc
+[1.911s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/chassis.py to chassis.cpython-310.pyc
+[1.914s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/gripper.py to gripper.cpython-310.pyc
+[1.916s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/arm.py to arm.cpython-310.pyc
+[1.918s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/armor.py to armor.cpython-310.pyc
+[1.919s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/vision.py to vision.cpython-310.pyc
+[1.920s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/servo.py to servo.cpython-310.pyc
+[1.922s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/h264_parser.py to h264_parser.cpython-310.pyc
+[1.922s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/led.py to led.cpython-310.pyc
+[1.923s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/blaster.py to blaster.cpython-310.pyc
+[1.923s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/sbus.py to sbus.cpython-310.pyc
+[1.924s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/pwm.py to pwm.cpython-310.pyc
+[1.924s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/modules/sensor_adapter.py to sensor_adapter.cpython-310.pyc
+[1.925s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/robomaster_driver.py to robomaster_driver.cpython-310.pyc
+[1.926s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/ftp.py to ftp.cpython-310.pyc
+[1.927s] byte-compiling /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros/utils.py to utils.cpython-310.pyc
+[1.927s] running install_data
+[1.928s] creating /home/while/robomaster_ws/install/robomaster_ros/share/ament_index/resource_index/packages
+[1.929s] copying resource/robomaster_ros -> /home/while/robomaster_ws/install/robomaster_ros/share/ament_index/resource_index/packages
+[1.929s] copying package.xml -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros
+[1.929s] creating /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/launch
+[1.930s] copying launch/teleop_linux.launch -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/launch
+[1.930s] copying launch/camera.launch -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/launch
+[1.930s] copying launch/teleop.launch -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/launch
+[1.930s] copying launch/ep.launch -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/launch
+[1.931s] copying launch/s1.launch -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/launch
+[1.931s] copying launch/main.launch -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/launch
+[1.931s] copying launch/decoder.launch -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/launch
+[1.931s] creating /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/config
+[1.931s] copying config/servos.yaml -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/config
+[1.932s] copying config/rm_camera_calibration_360.yaml -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/config
+[1.932s] copying config/rm_camera_calibration_540_simulation.yaml -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/config
+[1.932s] copying config/rm_camera_calibration_540.yaml -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/config
+[1.932s] copying config/rm_camera_calibration_360_simulation.yaml -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/config
+[1.932s] copying config/joy_config_s1.yaml -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/config
+[1.933s] copying config/rm_camera_calibration_720.yaml -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/config
+[1.933s] copying config/joy_config_ep.yaml -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/config
+[1.933s] copying config/rm_camera_calibration_720_simulation.yaml -> /home/while/robomaster_ws/install/robomaster_ros/share/robomaster_ros/config
+[1.933s] running install_egg_info
+[1.953s] Copying ../../../build/robomaster_ros/robomaster_ros.egg-info to /home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages/robomaster_ros-0.0.0-py3.10.egg-info
+[1.954s] running install_scripts
+[1.992s] Installing connect script to /home/while/robomaster_ws/install/robomaster_ros/lib/robomaster_ros
+[1.992s] Installing discover script to /home/while/robomaster_ws/install/robomaster_ros/lib/robomaster_ros
+[1.993s] Installing display_battery script to /home/while/robomaster_ws/install/robomaster_ros/lib/robomaster_ros
+[1.993s] Installing h264_decoder script to /home/while/robomaster_ws/install/robomaster_ros/lib/robomaster_ros
+[1.993s] Installing play_audio script to /home/while/robomaster_ws/install/robomaster_ros/lib/robomaster_ros
+[1.993s] Installing play_opus script to /home/while/robomaster_ws/install/robomaster_ros/lib/robomaster_ros
+[1.993s] Installing robomaster_driver script to /home/while/robomaster_ws/install/robomaster_ros/lib/robomaster_ros
+[1.994s] writing list of installed files to '/home/while/robomaster_ws/build/robomaster_ros/install.log'
+[2.016s] Invoked command in '/home/while/robomaster_ws/src/robomaster_ros/robomaster_ros' returned '0': AMENT_PREFIX_PATH=/home/while/robomaster_ws/install/robomaster_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/while/robomaster_ws/install/robomaster_msgs LD_LIBRARY_PATH=/home/while/robomaster_ws/install/robomaster_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/while/robomaster_ws/build/robomaster_ros/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/while/robomaster_ws/install/robomaster_ros/lib/python3.10/site-packages:/home/while/robomaster_ws/install/robomaster_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../../build/robomaster_ros build --build-base /home/while/robomaster_ws/build/robomaster_ros/build install --record /home/while/robomaster_ws/build/robomaster_ros/install.log --single-version-externally-managed install_data
