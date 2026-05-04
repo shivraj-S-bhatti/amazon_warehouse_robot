@@ -102,13 +102,14 @@ class VisionNode(Node):
             self.get_logger().warn(f"Failed to convert image: {e}")
             return
 
-        self.frame_count += 1
+        with self.lock:
+            self.frame_count += 1
 
         # Convert to grayscale for detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # Detect markers
-        corners, ids, rejected = self.detector.detectMarkers(gray)
+        corners, ids, _ = self.detector.detectMarkers(gray)
 
         new_detections = {}
 
@@ -275,7 +276,7 @@ def main():
         else:
             node.get_logger().info("No markers detected")
 
-    timer = node.create_timer(0.5, print_detections)
+    node.create_timer(0.5, print_detections)
 
     try:
         rclpy.spin(node)

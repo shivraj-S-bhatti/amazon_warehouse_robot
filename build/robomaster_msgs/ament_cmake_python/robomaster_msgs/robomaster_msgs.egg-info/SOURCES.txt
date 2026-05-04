@@ -1,6 +1,0 @@
-setup.py
-robomaster_msgs/__init__.py
-robomaster_msgs.egg-info/PKG-INFO
-robomaster_msgs.egg-info/SOURCES.txt
-robomaster_msgs.egg-info/dependency_links.txt
-robomaster_msgs.egg-info/top_level.txt

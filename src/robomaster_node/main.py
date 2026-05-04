@@ -18,7 +18,6 @@ Usage:
     python3 main.py
 """
 import sys
-from std_msgs.msg import Bool, Int32
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 import threading
@@ -49,6 +48,7 @@ from chassis_control import ChassisController
 from arm_control import ArmController
 
 
+
 class StateMachine:
     """
     Main state machine that orchestrates the pick-and-transport task.
@@ -68,9 +68,6 @@ class StateMachine:
         self.obstacle = ObstacleNode()
         self.chassis = ChassisController()
         self.arm = ArmController()
-
-        self.smart_enable_pub = self.chassis.create_publisher(Bool, '/smart_movement/enable', 10)
-        self.smart_target_pub = self.chassis.create_publisher(Int32, '/smart_movement/target_id', 10)
 
         # ── Background executor for nodes needing callback processing ──
         self.executor = MultiThreadedExecutor(num_threads=4)
@@ -98,16 +95,6 @@ class StateMachine:
         # ── Logging ──
         self.logger = self.chassis.get_logger()
     
-    def set_smart_movement(self, enable: bool, target_id: int = 0):
-        """Turns the Avoidance Autopilot on or off and sets the target."""
-        target_msg = Int32()
-        target_msg.data = target_id
-        self.smart_target_pub.publish(target_msg)
-
-        enable_msg = Bool()
-        enable_msg.data = enable
-        self.smart_enable_pub.publish(enable_msg)
-
     def _spin_executor(self):
         """Spin the executor in a background thread."""
         try:
@@ -131,6 +118,7 @@ class StateMachine:
             self.logger.info(
                 f'Object marker {OBJECT_MARKER_ID} found at '
                 f'{detection["distance"]:.2f}m')
+            self.chassis.stop()
             self.marker_last_seen_time = time.time()
             return STATE_APPROACH_OBJECT
 
@@ -140,15 +128,12 @@ class StateMachine:
 
     def handle_approach_object(self):
         self.chassis.set_led_approaching()
-        self.set_smart_movement(True, OBJECT_MARKER_ID)
 
-        # 2. Use OpenCV vision strictly as a depth/distance sensor
         detection = self.vision.get_marker(OBJECT_MARKER_ID)
 
         if detection is None:
             if time.time() - self.marker_last_seen_time > MARKER_LOST_TIMEOUT:
                 self.logger.warn('Object marker lost — returning to search')
-                self.set_smart_movement(False)
                 self.chassis.stop()
                 return STATE_SEARCH_OBJECT
             return STATE_APPROACH_OBJECT
@@ -157,15 +142,22 @@ class StateMachine:
 
         if detection['distance'] < APPROACH_DISTANCE:
             self.logger.info('Close enough to object — stopping to pick up')
-            self.set_smart_movement(False) # Turn off autopilot!
             self.chassis.stop()
             time.sleep(0.5)
-
-            # (Optional: Keep the fine-alignment loop here if you want)
-
             return STATE_PICK_UP
 
-        # Autopilot is driving! Just wait.
+        # If a real obstacle is in the way (not the marker itself), stop and avoid
+        if self.obstacle.is_blocked():
+            tof = self.obstacle.get_distance()
+            if tof < detection['distance'] - 0.10:
+                self.logger.warn('Obstacle on approach to object!')
+                self.chassis.stop()
+                self.avoid_start_time = time.time()
+                self.avoid_nudge_count = 0
+                self.pre_avoid_state = STATE_APPROACH_OBJECT
+                return STATE_OBSTACLE_AVOID
+
+        self.chassis.drive_toward_marker(detection)
         return STATE_APPROACH_OBJECT
 
     def handle_pick_up(self):
@@ -194,33 +186,54 @@ class StateMachine:
 
         if self.current_waypoint_index >= len(WAYPOINT_MARKER_IDS):
             self.logger.info('All waypoints passed — searching for destination')
-            self.set_smart_movement(False)
             return STATE_SEARCH_DEST
 
         current_marker_id = WAYPOINT_MARKER_IDS[self.current_waypoint_index]
-        self.set_smart_movement(True, current_marker_id) # Turn ON Autopilot
 
-        # (Keep the DEST_MARKER_ID shortcut check here)
+        # Shortcut: if we can already see the destination, go straight to approach
+        dest_detection = self.vision.get_marker(DEST_MARKER_ID)
+        if dest_detection is not None:
+            self.logger.info('Destination marker visible — skipping remaining waypoints')
+            self.chassis.stop()
+            self.marker_last_seen_time = time.time()
+            return STATE_APPROACH_DEST
 
         detection = self.vision.get_marker(current_marker_id)
 
         if detection is None:
-            # (Keep the marker lost/timeout logic here)
+            if time.time() - self.marker_last_seen_time > MARKER_LOST_TIMEOUT:
+                # Start rotating to search for the waypoint
+                if self.waypoint_search_start is None:
+                    self.waypoint_search_start = time.time()
+                    self.logger.info(f'Waypoint {current_marker_id} lost — rotating to search')
+                elif time.time() - self.waypoint_search_start > WAYPOINT_SEARCH_TIMEOUT:
+                    self.logger.warn(f'Waypoint {current_marker_id} not found after {WAYPOINT_SEARCH_TIMEOUT}s — skipping')
+                    self.current_waypoint_index += 1
+                    self.waypoint_search_start = None
+                    self.marker_last_seen_time = time.time()
+                    return STATE_NAVIGATE
+                self.chassis.rotate(SEARCH_ROTATE_SPEED)
             return STATE_NAVIGATE
 
         self.marker_last_seen_time = time.time()
         self.waypoint_search_start = None
 
         if detection['distance'] < WAYPOINT_SWITCH_DISTANCE:
-            self.current_waypoint_index += 1
             self.logger.info(f'Waypoint {current_marker_id} reached')
+            self.current_waypoint_index += 1
             self.marker_last_seen_time = time.time()
-            # Turn off autopilot briefly while switching
-            self.set_smart_movement(False) 
             return STATE_NAVIGATE
 
-        # Notice how we deleted `obstacle.is_blocked()` and `chassis.navigate_toward_marker()`!
-        # The autopilot is steering and bypassing for us.
+        # Obstacle check — stop and avoid if something is in the way
+        if self.obstacle.is_blocked():
+            self.logger.warn(f'Obstacle during navigation to waypoint {current_marker_id}!')
+            self.chassis.stop()
+            self.avoid_start_time = time.time()
+            self.avoid_nudge_count = 0
+            self.pre_avoid_state = STATE_NAVIGATE
+            return STATE_OBSTACLE_AVOID
+
+        self.chassis.navigate_toward_marker(detection)
         return STATE_NAVIGATE
 
     def handle_obstacle_avoid(self):
@@ -281,6 +294,7 @@ class StateMachine:
             self.logger.info(
                 f'Destination marker {DEST_MARKER_ID} found at '
                 f'{detection["distance"]:.2f}m')
+            self.chassis.stop()
             self.marker_last_seen_time = time.time()
             return STATE_APPROACH_DEST
 

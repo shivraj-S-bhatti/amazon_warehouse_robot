@@ -97,10 +97,11 @@ STEER_DEADZONE = 0.02              # meters
 # Arm Positions (meters, relative to arm_base_link)
 # =============================================================================
 # These need tuning on the real robot!
-ARM_PICK_X = 0.18                  # forward reach for picking
-ARM_PICK_Z = -0.04                 # height for picking (slightly below neutral)
-ARM_CARRY_X = 0.12                 # forward position while carrying
-ARM_CARRY_Z = 0.08                 # lifted height while carrying
+ARM_PICK_X = 0.15                  # forward reach for picking
+ARM_PICK_Z = 0.10                # absolute height floor (hardware limit)
+ARM_PICK_LOWER = -0.00           # relative drop from floor to reach object (negative = down)
+ARM_CARRY_X = 0.09                 # forward position while carrying
+ARM_CARRY_Z = 0.7                 # lifted height while carrying (match retract to keep camera level)
 ARM_PLACE_X = 0.18                 # forward reach for placing
 ARM_PLACE_Z = 0.05                 # height for placing
 ARM_RETRACT_X = 0.09               # retracted position

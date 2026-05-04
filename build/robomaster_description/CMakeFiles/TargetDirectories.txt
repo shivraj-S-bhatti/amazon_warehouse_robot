@@ -1,9 +1,0 @@
-/home/while/robomaster_ws/build/robomaster_description/CMakeFiles/uninstall.dir
-/home/while/robomaster_ws/build/robomaster_description/CMakeFiles/robomaster_description_uninstall.dir
-/home/while/robomaster_ws/build/robomaster_description/CMakeFiles/test.dir
-/home/while/robomaster_ws/build/robomaster_description/CMakeFiles/edit_cache.dir
-/home/while/robomaster_ws/build/robomaster_description/CMakeFiles/rebuild_cache.dir
-/home/while/robomaster_ws/build/robomaster_description/CMakeFiles/list_install_components.dir
-/home/while/robomaster_ws/build/robomaster_description/CMakeFiles/install.dir
-/home/while/robomaster_ws/build/robomaster_description/CMakeFiles/install/local.dir
-/home/while/robomaster_ws/build/robomaster_description/CMakeFiles/install/strip.dir

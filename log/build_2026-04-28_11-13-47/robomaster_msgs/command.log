@@ -1,6 +1,0 @@
-Invoking command in '/home/while/robomaster_ws/build/robomaster_msgs': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/while/robomaster_ws/src/robomaster_ros/robomaster_msgs -DCMAKE_INSTALL_PREFIX=/home/while/robomaster_ws/install/robomaster_msgs
-Invoked command in '/home/while/robomaster_ws/build/robomaster_msgs' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/while/robomaster_ws/src/robomaster_ros/robomaster_msgs -DCMAKE_INSTALL_PREFIX=/home/while/robomaster_ws/install/robomaster_msgs
-Invoking command in '/home/while/robomaster_ws/build/robomaster_msgs': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/while/robomaster_ws/build/robomaster_msgs -- -j16 -l16
-Invoked command in '/home/while/robomaster_ws/build/robomaster_msgs' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/while/robomaster_ws/build/robomaster_msgs -- -j16 -l16
-Invoking command in '/home/while/robomaster_ws/build/robomaster_msgs': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/while/robomaster_ws/build/robomaster_msgs
-Invoked command in '/home/while/robomaster_ws/build/robomaster_msgs' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/while/robomaster_ws/build/robomaster_msgs
