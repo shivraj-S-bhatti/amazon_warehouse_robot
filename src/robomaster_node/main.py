@@ -33,7 +33,8 @@ from config import (
     # Marker IDs
     OBJECT_MARKER_ID, WAYPOINT_MARKER_IDS, DEST_MARKER_ID,
     # Thresholds
-    APPROACH_DISTANCE, WAYPOINT_SWITCH_DISTANCE, DEST_APPROACH_DISTANCE,
+    APPROACH_DISTANCE, APPROACH_LATERAL_MAX,
+    WAYPOINT_SWITCH_DISTANCE, DEST_APPROACH_DISTANCE,
     MARKER_LOST_TIMEOUT, WAYPOINT_SEARCH_TIMEOUT,
     # Obstacle
     STRAFE_DIRECTION, STRAFE_DURATION,
@@ -147,6 +148,13 @@ class StateMachine:
 
         # Check if close enough to pick up
         if detection['distance'] < APPROACH_DISTANCE:
+            # If still off-center, rotate in place to center before stopping
+            if abs(detection['lateral']) > APPROACH_LATERAL_MAX:
+                self.logger.info(
+                    f'Close but off-center (lateral={detection["lateral"]:.3f}m) — centering')
+                self.chassis.align_to_marker(detection)
+                return STATE_APPROACH_OBJECT
+
             self.logger.info('Close enough to object — stopping to pick up')
             self.chassis.stop()
             time.sleep(0.5)
@@ -371,6 +379,13 @@ class StateMachine:
 
         # Close enough to place
         if detection['distance'] < DEST_APPROACH_DISTANCE:
+            # If still off-center, rotate in place to center before stopping
+            if abs(detection['lateral']) > APPROACH_LATERAL_MAX:
+                self.logger.info(
+                    f'Close but off-center (lateral={detection["lateral"]:.3f}m) — centering')
+                self.chassis.align_to_marker(detection)
+                return STATE_APPROACH_DEST
+
             self.logger.info('At destination — stopping to place')
             self.chassis.stop()
             time.sleep(0.5)
@@ -391,20 +406,14 @@ class StateMachine:
                 self.logger.warn('Fine alignment incomplete — proceeding anyway')
             return STATE_PLACE
 
-        # Check for obstacles — skip if the "obstacle" is the destination itself
-        if self.obstacle.is_blocked():
-            tof = self.obstacle.get_distance()
-            if tof >= detection['distance'] - 0.10:
-                pass  # ToF is reading the destination marker, not a real obstacle
-            else:
-                self.logger.warn('Obstacle on approach to destination!')
-                self.chassis.stop()
-                self.avoid_start_time = time.time()
-                self.avoid_nudge_count = 0
-                self.pre_avoid_state = STATE_APPROACH_DEST
-                return STATE_OBSTACLE_AVOID
+        # No obstacle avoidance during final approach to destination:
+        # the arm in carry position blocks the TOF sensor (~0.38m) and would
+        # trigger false avoidance. The approach is short and to a known target.
 
         self.chassis.drive_toward_marker(detection)
+        self.logger.info(
+            f'Approaching dest: dist={detection["distance"]:.2f}m, '
+            f'lateral={detection["lateral"]:.3f}m')
         return STATE_APPROACH_DEST
 
     def handle_place(self):

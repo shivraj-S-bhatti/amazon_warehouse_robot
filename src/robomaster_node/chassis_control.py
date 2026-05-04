@@ -163,9 +163,9 @@ class ChassisController(Node):
         forward_speed = SPEED_KP * distance
         forward_speed = max(APPROACH_MIN_SPEED, min(approach_speed, forward_speed))
 
-        # If the marker is far off-center, stop and rotate in place first
+        # If the marker is far off-center, slow to minimum speed while steering
         if abs(angular_z) > 0.3:
-            forward_speed = 0.0
+            forward_speed = APPROACH_MIN_SPEED
 
         self.move(linear_x=forward_speed, angular_z=angular_z)
 
@@ -227,9 +227,9 @@ class ChassisController(Node):
         else:
             forward_speed = NAVIGATE_SPEED
 
-        # Stop and rotate in place if the marker is far off-center
+        # If the marker is far off-center, slow to minimum speed while steering
         if abs(angular_z) > 0.3:
-            forward_speed = 0.0
+            forward_speed = APPROACH_MIN_SPEED
 
         self.move(linear_x=forward_speed, angular_z=angular_z)
 

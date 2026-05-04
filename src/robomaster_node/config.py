@@ -53,7 +53,8 @@ STATE_DONE = "DONE"
 # =============================================================================
 # Approach & Navigation Thresholds
 # =============================================================================
-APPROACH_DISTANCE = 0.20        # meters — stop this far from object marker
+APPROACH_DISTANCE = 0.25        # meters — stop this far from object marker
+APPROACH_LATERAL_MAX = 0.08    # meters — max lateral offset allowed before stopping for pick-up/place
 WAYPOINT_SWITCH_DISTANCE = 0.60 # meters — close enough to switch to next waypoint
 DEST_APPROACH_DISTANCE = 0.20   # meters — stop this far from destination marker
 
@@ -85,22 +86,23 @@ NAVIGATE_SPEED = 0.25               # m/s — forward speed between waypoints
 # Visual Servoing Gains
 # =============================================================================
 # Proportional gain for steering toward marker center
-STEER_KP = 0.8                     # angular.z = KP * lateral_error
+STEER_KP = 1.5                     # angular.z = KP * lateral_error
 
 # Proportional gain for speed based on distance
 SPEED_KP = 0.5                     # linear.x = KP * distance (clamped)
 
 # Lateral error dead zone — don't steer if error is smaller than this
-STEER_DEADZONE = 0.02              # meters
+STEER_DEADZONE = 0.03              # meters
 
 # =============================================================================
 # Arm Positions (meters, relative to arm_base_link)
 # =============================================================================
 # These need tuning on the real robot!
-ARM_PICK_X = 0.18                  # forward reach for picking
-ARM_PICK_Z = 0.00                 # height for picking (slightly below neutral)
+ARM_PICK_X = 0.15                  # forward reach for picking
+ARM_PICK_Z = 0.10                # absolute height floor (hardware limit)
+ARM_PICK_LOWER = -0.00           # relative drop from floor to reach object (negative = down)
 ARM_CARRY_X = 0.09                 # forward position while carrying
-ARM_CARRY_Z = 0.13                 # lifted height while carrying (match retract to keep camera level)
+ARM_CARRY_Z = 0.7                 # lifted height while carrying (match retract to keep camera level)
 ARM_PLACE_X = 0.18                 # forward reach for placing
 ARM_PLACE_Z = 0.05                 # height for placing
 ARM_RETRACT_X = 0.09               # retracted position

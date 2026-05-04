@@ -18,11 +18,12 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from robomaster_msgs.action import MoveArm, GripperControl
+from geometry_msgs.msg import PointStamped
 import time
 import threading
 
 from config import (
-    ARM_PICK_X, ARM_PICK_Z,
+    ARM_PICK_X, ARM_PICK_Z, ARM_PICK_LOWER,
     ARM_CARRY_X, ARM_CARRY_Z,
     ARM_PLACE_X, ARM_PLACE_Z,
     ARM_RETRACT_X, ARM_RETRACT_Z,
@@ -53,6 +54,12 @@ class ArmController(Node):
         self._gripper_state = None  # 0=PAUSE, 1=OPEN, 2=CLOSE
         self._is_carrying = False
 
+        # Subscribe to actual arm position for diagnostics
+        self.create_subscription(
+            PointStamped, 'arm_position', self._arm_position_callback, 1)
+        self._actual_x = None
+        self._actual_z = None
+
         self.get_logger().info('ArmController initialized')
 
     # ─────────────────────────────────────────────────────────────
@@ -81,6 +88,10 @@ class ArmController(Node):
 
         self.get_logger().info('Arm and gripper action servers ready!')
         return True
+
+    def _arm_position_callback(self, msg: PointStamped) -> None:
+        self._actual_x = msg.point.x
+        self._actual_z = msg.point.z
 
     # ─────────────────────────────────────────────────────────────
     # Low-level: Arm movement
@@ -127,10 +138,15 @@ class ArmController(Node):
             self.get_logger().warn('Arm movement timed out!')
             return False
 
-        # Small delay for arm to settle
+        # Small delay for arm to settle, then spin briefly to receive position feedback
         time.sleep(ARM_WAIT_TIME)
+        rclpy.spin_once(self, timeout_sec=0.2)
 
-        self.get_logger().info('Arm movement complete')
+        if self._actual_x is not None:
+            self.get_logger().info(
+                f'Arm movement complete — actual pos: x={self._actual_x:.3f}, z={self._actual_z:.3f}')
+        else:
+            self.get_logger().info('Arm movement complete — actual pos: unknown (no feedback yet)')
         return True
 
     # ─────────────────────────────────────────────────────────────
@@ -224,10 +240,14 @@ class ArmController(Node):
             self.get_logger().error('Failed to open gripper')
             return False
 
-        # Step 2: Lower arm to pick position
+        # Step 2: Lower arm to pick position, then drop further relative to hardware floor
         if not self.move_arm_to(ARM_PICK_X, ARM_PICK_Z, relative=False):
             self.get_logger().error('Failed to lower arm')
             return False
+        if ARM_PICK_LOWER != 0.0:
+            if not self.move_arm_to(0.0, ARM_PICK_LOWER, relative=True):
+                self.get_logger().error('Failed to lower arm (relative drop)')
+                return False
 
         # Step 3: Close gripper to grab object
         if not self.close_gripper():
