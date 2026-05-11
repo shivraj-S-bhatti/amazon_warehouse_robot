@@ -89,7 +89,7 @@ def generate_launch_description() -> LaunchDescription:
                 "camera.video.raw": 2,     # ON_DEMAND
                 "camera.video.h264": 2,    # ON_DEMAND
                 "camera.video.ffmpeg": 2,  # ON_DEMAND
-                "camera.video.resolution": 360,
+                "camera.video.resolution": 540,
                 "camera.video.rate": -1.0,
                 "camera.audio.raw": 0,
                 "camera.audio.opus": 0,
@@ -123,7 +123,20 @@ def generate_launch_description() -> LaunchDescription:
                 "uart.enabled": False,
                 
                 "vision.enabled": True,
-                "vision.targets": ["person","marker:red"], # Add other targets here if needed
+                # IMPORTANT: The DJI vision SDK is single-color for markers.
+                # Each call to sub_detect_info("marker", color=…) OVERWRITES the
+                # previous color filter, so listing multiple "marker:<color>"
+                # entries leaves only the LAST one active. Pick the one that
+                # matches the physical color of your markers:
+                #   "marker:red"   — official DJI Robomaster vision markers
+                #                    (heart, sword, digits, letters, arrows) are
+                #                    printed in red — this is almost always the
+                #                    correct setting.
+                #   "marker:green" — green-printed markers (rare)
+                #   "marker:blue"  — blue-printed markers (rare)
+                # If detection fails, try switching the color one at a time and
+                # re-launching.
+                "vision.targets": ["person", "marker:red"],
                 
                 "gimbal.enabled": is_s1,
                 "gimbal.rate": 10,
