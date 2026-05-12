@@ -68,9 +68,15 @@ WAYPOINT_SEARCH_TIMEOUT = 15.0  # seconds
 # =============================================================================
 # Obstacle Avoidance (ToF Sensor)
 # =============================================================================
-TOF_TOPIC = "range_0"                # ToF sensor topic
+TOF_TOPIC = "range_0"                # forward-facing ToF topic
+TOF_LEFT_TOPIC  = "range_1"         # left side ToF — verify with: ros2 topic list
+TOF_RIGHT_TOPIC = "range_2"         # right side ToF — verify with: ros2 topic list
 OBSTACLE_THRESHOLD = 0.50           # meters — trigger avoidance
 OBSTACLE_CLEAR_THRESHOLD = 0.80     # meters — safe to resume
+# During the U-detour forward leg, the side TOF on the obstacle side reads
+# short while the obstacle is beside the robot.  When it jumps above this
+# threshold the robot has moved past the obstacle and can strafe back.
+DETOUR_SIDE_CLEAR_THRESHOLD = 1.0   # meters
 STRAFE_DIRECTION = 1.0              # +1.0 = strafe left, -1.0 = strafe right
 STRAFE_DURATION = 1.5               # seconds to strafe before rechecking
 # When a marker is lost, if something is within this distance on TOF the robot
@@ -166,7 +172,11 @@ AVOID_TURN_SPEED     = 0.4          # rad/s while sidestepping a moving person
 DETOUR_STRAFE_SPEED     = 0.18      # m/s lateral speed during strafe legs
 DETOUR_STRAFE_DURATION  = 1.8       # s   → ~0.32 m lateral offset
 DETOUR_FORWARD_SPEED    = 0.20      # m/s forward speed during middle leg
-DETOUR_FORWARD_DURATION = 2.5       # s   → ~0.50 m past the obstacle
+# Safety timeout for the forward leg.  In practice the robot exits Phase 2
+# early once the obstacle is cleared (marker visible or person at frame edge).
+# This value is the hard upper bound so the robot doesn't drive forever if
+# neither sensor signal fires.
+DETOUR_FORWARD_DURATION = 5.0       # s   (was 2.5 — dynamic exit now handles early stop)
 DETOUR_DEFAULT_DIR      = 1.0       # +1 = detour LEFT, -1 = detour RIGHT
                                     # (used when obstacle side is unknown,
                                     #  e.g. a ToF-only detection)

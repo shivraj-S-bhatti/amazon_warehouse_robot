@@ -255,6 +255,16 @@ class PeopleAvoidanceNode(Node):
         with self.lock:
             return self._smoothed_vel
 
+    def is_person_recently_detected(self, max_age: float = 0.4) -> bool:
+        """
+        True if a person appeared in an actual camera frame within the last
+        max_age seconds.  Unlike is_person_visible(), this ignores state
+        retention for STATIONARY persons — it reflects whether the person
+        is currently in the camera's field of view.
+        """
+        with self.lock:
+            return self._last_seen > 0 and (time.time() - self._last_seen) < max_age
+
     def notify_bypass_complete(self):
         """Call this after the bypass maneuver finishes to start cooldown."""
         with self.lock:

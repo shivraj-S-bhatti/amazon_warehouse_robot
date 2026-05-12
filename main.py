@@ -534,6 +534,67 @@ class StateMachine:
         self.chassis.navigate_toward_marker(detection)
         return STATE_NAVIGATE
 
+    def _active_detour_marker_id(self):
+        """Return the marker ID being tracked by the state that initiated the detour."""
+        if self.pre_avoid_state == STATE_NAVIGATE:
+            idx = self.current_waypoint_index
+            if idx < len(WAYPOINT_MARKER_IDS):
+                return WAYPOINT_MARKER_IDS[idx]
+        elif self.pre_avoid_state == STATE_APPROACH_OBJECT:
+            return OBJECT_MARKER_ID
+        elif self.pre_avoid_state == STATE_APPROACH_DEST:
+            return DEST_MARKER_ID
+        return None
+
+    def _obstacle_cleared_for_strafe_back(self) -> bool:
+        """
+        During Phase 2 of the U-detour (forward leg), return True when the
+        robot has moved far enough past the obstacle to safely strafe back.
+
+        Two signals:
+        1. Target marker is visible again — obstacle is definitively behind us.
+        2. Detected person has shifted to the far edge of the camera frame —
+           robot is now alongside or past them.  Direction-aware:
+             strafed LEFT  (+1): person drifts right → cleared when cx > 0.75
+             strafed RIGHT (−1): person drifts left  → cleared when cx < 0.25
+        """
+        # Signal 1: side TOF shows clear — most reliable geometric signal.
+        # While the obstacle is beside the robot the side sensor reads short
+        # (~0.3–0.8 m); once the robot passes it the reading jumps to open
+        # space.  Only fires if the sensor has received at least one reading,
+        # so a missing/unconfigured sensor never falsely triggers this.
+        if self.obstacle.is_detour_side_clear(self.detour_direction):
+            l = self.obstacle.get_left_distance()
+            r = self.obstacle.get_right_distance()
+            self.logger.info(
+                f'U-detour forward: side TOF clear '
+                f'(L={l:.2f}m R={r:.2f}m) — beginning strafe-back'
+            )
+            return True
+
+        # Signal 2: target marker visible — obstacle is definitively behind us.
+        mid = self._active_detour_marker_id()
+        if mid is not None and self.vision.get_marker(mid) is not None:
+            self.logger.info(
+                f'U-detour forward: marker {mid} visible — beginning strafe-back'
+            )
+            return True
+
+        # Signal 3: person has drifted to the far edge of the camera frame.
+        # Direction-aware: strafed LEFT (+1) → person drifts right (cx > 0.75);
+        #                  strafed RIGHT (−1) → person drifts left (cx < 0.25).
+        if self.people.is_person_recently_detected():
+            pcx = self.people.get_person_cx()
+            side = self.detour_direction
+            if (side > 0 and pcx > 0.75) or (side < 0 and pcx < 0.25):
+                self.logger.info(
+                    f'U-detour forward: person at frame edge '
+                    f'(cx={pcx:.2f}, side={side:+.0f}) — beginning strafe-back'
+                )
+                return True
+
+        return False
+
     def handle_obstacle_avoid(self):
         """
         U-shape detour around a stationary obstacle (person or non-person).
@@ -562,13 +623,22 @@ class StateMachine:
 
         # ── Phase 2: forward leg past the obstacle ──
         if elapsed < p2_end:
-            # If a *new* obstacle appears in front mid-detour, restart the
-            # U from STRAFE_OUT in the same direction so we don't drive
-            # straight into it.
+            # Dynamic exit: sensors confirm the obstacle is no longer in the
+            # strafe-back path — jump straight to Phase 3 without waiting for
+            # the full DETOUR_FORWARD_DURATION timeout.
+            if self._obstacle_cleared_for_strafe_back():
+                # Set the reference time so elapsed lands just past p2_end
+                # on the very next loop tick, entering Phase 3 immediately.
+                self.detour_start_time = time.time() - (p2_end + 0.01)
+                return STATE_OBSTACLE_AVOID
+
+            # If a *new* obstacle appears directly ahead mid-detour, restart
+            # Phase 1 in the same direction so we clear it too.
             if self.obstacle.is_blocked():
                 self.logger.warn('Second obstacle mid-detour — extending the U')
                 self.detour_start_time = time.time()
                 return STATE_OBSTACLE_AVOID
+
             self.chassis.move(linear_x=DETOUR_FORWARD_SPEED)
             return STATE_OBSTACLE_AVOID
 
