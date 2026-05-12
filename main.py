@@ -34,7 +34,7 @@ from config import (
     # Thresholds
     APPROACH_DISTANCE, WAYPOINT_SWITCH_DISTANCE, DEST_APPROACH_DISTANCE,
     MARKER_LOST_TIMEOUT, WAYPOINT_SEARCH_TIMEOUT, PERSON_BLOCK_AREA,
-    BLIND_APPROACH_THRESHOLD, APPROACH_MIN_SPEED,
+    BLIND_APPROACH_THRESHOLD, APPROACH_MIN_SPEED, MARKER_BLOCKED_THRESHOLD,
     RECENTER_YAW_THRESHOLD, RECENTER_YAW_SPEED,
     RECENTER_STRAFE_THRESHOLD, RECENTER_STRAFE_SPEED, RECENTER_SETTLED_COUNT,
     # Speeds
@@ -102,6 +102,11 @@ class StateMachine:
         self._recenter_phase   = 'yaw'
         self._recenter_settled = 0
 
+        # Timestamp of the last completed U-detour; used to prevent the
+        # marker-lost obstacle check from triggering another detour
+        # immediately after one just finished.
+        self._post_detour_time = 0.0
+
         # ── Logging ──
         self.logger = self.chassis.get_logger()
     
@@ -115,6 +120,45 @@ class StateMachine:
     # =================================================================
     # Recentering helpers
     # =================================================================
+
+    def _try_obstacle_detour(self, resume_state: str) -> str | None:
+        """
+        When a marker has been lost, check whether an obstacle is likely
+        blocking the camera and short-circuit to a U-detour instead of spinning.
+
+        Returns the next state (STATE_OBSTACLE_AVOID) if a detour is warranted,
+        or None if the caller should proceed with its normal lost-marker logic.
+
+        A 6-second lockout after the last completed detour prevents rapid
+        re-triggering if the obstacle lingers just above OBSTACLE_THRESHOLD
+        after the robot moves forward.
+        """
+        # Don't re-trigger the detour if one just finished within the lockout window
+        if time.time() - self._post_detour_time < 6.0:
+            return None
+
+        tof_dist = self.obstacle.get_distance()
+        person_visible = self.people.is_person_visible()
+
+        if tof_dist >= MARKER_BLOCKED_THRESHOLD and not person_visible:
+            return None
+
+        # Use the person's known position to pick the detour side when available
+        if person_visible:
+            pcx = self.people.get_person_cx()
+            self.detour_direction = 1.0 if pcx > 0.5 else -1.0
+        else:
+            self.detour_direction = DETOUR_DEFAULT_DIR
+
+        self.logger.warn(
+            f'Marker lost with obstacle suspected '
+            f'(tof={tof_dist:.2f}m, person={person_visible}) — '
+            f'U-detour {"LEFT" if self.detour_direction > 0 else "RIGHT"}'
+        )
+        self.chassis.stop()
+        self.detour_start_time = time.time()
+        self.pre_avoid_state = resume_state
+        return STATE_OBSTACLE_AVOID
 
     def _reset_recenter(self):
         """Reset recentering sub-state. Call whenever the marker is lost."""
@@ -221,7 +265,13 @@ class StateMachine:
                 time.sleep(0.5)
                 return STATE_PICK_UP
 
-            if time.time() - self.marker_last_seen_time > MARKER_LOST_TIMEOUT:
+            elapsed = time.time() - self.marker_last_seen_time
+            if elapsed > 1.0:
+                next_state = self._try_obstacle_detour(STATE_APPROACH_OBJECT)
+                if next_state is not None:
+                    return next_state
+
+            if elapsed > MARKER_LOST_TIMEOUT:
                 self.logger.warn('Object marker lost — returning to search')
                 self.chassis.stop()
                 return STATE_SEARCH_OBJECT
@@ -426,7 +476,18 @@ class StateMachine:
         detection = self.vision.get_marker(current_marker_id)
 
         if detection is None:
-            if time.time() - self.marker_last_seen_time > MARKER_LOST_TIMEOUT:
+            elapsed = time.time() - self.marker_last_seen_time
+            # If the robot has been stopped for > 1 s without seeing the marker,
+            # check whether an obstacle is blocking the camera.  If so, detour
+            # instead of spinning — the TOF check at the top of the loop only
+            # fires when the robot is close enough to trigger OBSTACLE_THRESHOLD,
+            # but the robot is already stopped so it never gets that close.
+            if elapsed > 1.0:
+                next_state = self._try_obstacle_detour(STATE_NAVIGATE)
+                if next_state is not None:
+                    return next_state
+
+            if elapsed > MARKER_LOST_TIMEOUT:
                 if self.waypoint_search_start is None:
                     self.waypoint_search_start = time.time()
                     self.logger.info(f'Waypoint {current_marker_id} lost — rotating to search')
@@ -505,6 +566,7 @@ class StateMachine:
         # immediately spin-search just because the marker wasn't visible
         # while we were strafing.
         self.marker_last_seen_time = time.time()
+        self._post_detour_time = time.time()
         self.waypoint_search_start = None
         self._reset_recenter()
         resume_state = self.pre_avoid_state or STATE_NAVIGATE
@@ -545,7 +607,13 @@ class StateMachine:
                 time.sleep(0.5)
                 return STATE_PLACE
 
-            if time.time() - self.marker_last_seen_time > MARKER_LOST_TIMEOUT:
+            elapsed = time.time() - self.marker_last_seen_time
+            if elapsed > 1.0:
+                next_state = self._try_obstacle_detour(STATE_APPROACH_DEST)
+                if next_state is not None:
+                    return next_state
+
+            if elapsed > MARKER_LOST_TIMEOUT:
                 self.chassis.stop()
                 return STATE_SEARCH_DEST
             return STATE_APPROACH_DEST

@@ -73,6 +73,11 @@ OBSTACLE_THRESHOLD = 0.50           # meters — trigger avoidance
 OBSTACLE_CLEAR_THRESHOLD = 0.80     # meters — safe to resume
 STRAFE_DIRECTION = 1.0              # +1.0 = strafe left, -1.0 = strafe right
 STRAFE_DURATION = 1.5               # seconds to strafe before rechecking
+# When a marker is lost, if something is within this distance on TOF the robot
+# treats the obstacle as the cause and initiates a U-detour instead of spinning.
+# Larger than OBSTACLE_THRESHOLD so we catch obstacles that block the camera
+# before the robot gets close enough to trigger the normal TOF avoidance.
+MARKER_BLOCKED_THRESHOLD = 1.5      # meters
 
 # =============================================================================
 # Chassis Speeds
