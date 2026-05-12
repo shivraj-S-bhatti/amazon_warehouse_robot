@@ -121,40 +121,58 @@ class StateMachine:
     # Recentering helpers
     # =================================================================
 
-    def _try_obstacle_detour(self, resume_state: str) -> str | None:
+    def _try_obstacle_detour(self, resume_state: str, elapsed: float) -> str | None:
         """
-        When a marker has been lost, check whether an obstacle is likely
-        blocking the camera and short-circuit to a U-detour instead of spinning.
+        When a marker has been lost, decide whether to do a U-detour instead
+        of spinning to search.
 
-        Returns the next state (STATE_OBSTACLE_AVOID) if a detour is warranted,
-        or None if the caller should proceed with its normal lost-marker logic.
+        Two trigger modes (both guarded by a 6 s post-detour lockout):
 
-        A 6-second lockout after the last completed detour prevents rapid
-        re-triggering if the obstacle lingers just above OBSTACLE_THRESHOLD
-        after the robot moves forward.
+        1. Obstacle/person sensor evidence AND elapsed > 1 s:
+           TOF shows something within MARKER_BLOCKED_THRESHOLD, or the people
+           node still has a person in view.  This covers the case where the
+           robot stopped before reaching the normal 0.5 m TOF threshold.
+
+        2. Blind fallback AND elapsed > 2 s:
+           No sensor confirms an obstacle, but the marker has been consistently
+           absent long enough that something almost certainly blocked the view.
+           Covers two common failure modes:
+             - The person was briefly classified as MOVING (dodge turned the
+               robot away, losing both the person from TOF/camera AND the
+               marker), so by the time we reach this branch all sensor reads
+               look clear.
+             - The TOF's narrow beam simply missed the person (they're slightly
+               off the beam axis).
+           2 s is chosen to be shorter than MARKER_LOST_TIMEOUT (3 s) so the
+           detour fires before the robot starts spinning.
         """
-        # Don't re-trigger the detour if one just finished within the lockout window
         if time.time() - self._post_detour_time < 6.0:
             return None
 
         tof_dist = self.obstacle.get_distance()
         person_visible = self.people.is_person_visible()
+        obstacle_suspected = tof_dist < MARKER_BLOCKED_THRESHOLD or person_visible
 
-        if tof_dist >= MARKER_BLOCKED_THRESHOLD and not person_visible:
+        if obstacle_suspected and elapsed >= 1.0:
+            if person_visible:
+                pcx = self.people.get_person_cx()
+                self.detour_direction = 1.0 if pcx > 0.5 else -1.0
+            else:
+                self.detour_direction = DETOUR_DEFAULT_DIR
+            self.logger.warn(
+                f'Marker lost with obstacle suspected '
+                f'(tof={tof_dist:.2f}m, person={person_visible}) — '
+                f'U-detour {"LEFT" if self.detour_direction > 0 else "RIGHT"}'
+            )
+        elif not obstacle_suspected and elapsed >= 2.0:
+            self.detour_direction = DETOUR_DEFAULT_DIR
+            self.logger.warn(
+                f'Marker lost {elapsed:.1f}s with no sensor evidence of obstacle — '
+                f'blind U-detour fallback (MOVING-person dodge or off-axis TOF)'
+            )
+        else:
             return None
 
-        # Use the person's known position to pick the detour side when available
-        if person_visible:
-            pcx = self.people.get_person_cx()
-            self.detour_direction = 1.0 if pcx > 0.5 else -1.0
-        else:
-            self.detour_direction = DETOUR_DEFAULT_DIR
-
-        self.logger.warn(
-            f'Marker lost with obstacle suspected '
-            f'(tof={tof_dist:.2f}m, person={person_visible}) — '
-            f'U-detour {"LEFT" if self.detour_direction > 0 else "RIGHT"}'
-        )
         self.chassis.stop()
         self.detour_start_time = time.time()
         self.pre_avoid_state = resume_state
@@ -267,7 +285,7 @@ class StateMachine:
 
             elapsed = time.time() - self.marker_last_seen_time
             if elapsed > 1.0:
-                next_state = self._try_obstacle_detour(STATE_APPROACH_OBJECT)
+                next_state = self._try_obstacle_detour(STATE_APPROACH_OBJECT, elapsed)
                 if next_state is not None:
                     return next_state
 
@@ -483,7 +501,7 @@ class StateMachine:
             # fires when the robot is close enough to trigger OBSTACLE_THRESHOLD,
             # but the robot is already stopped so it never gets that close.
             if elapsed > 1.0:
-                next_state = self._try_obstacle_detour(STATE_NAVIGATE)
+                next_state = self._try_obstacle_detour(STATE_NAVIGATE, elapsed)
                 if next_state is not None:
                     return next_state
 
@@ -609,7 +627,7 @@ class StateMachine:
 
             elapsed = time.time() - self.marker_last_seen_time
             if elapsed > 1.0:
-                next_state = self._try_obstacle_detour(STATE_APPROACH_DEST)
+                next_state = self._try_obstacle_detour(STATE_APPROACH_DEST, elapsed)
                 if next_state is not None:
                     return next_state
 
