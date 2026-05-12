@@ -15,7 +15,7 @@ WAYPOINT_MARKER_IDS = [1, 2, 3, 4]  # Markers along the route, in order
 DEST_MARKER_ID = 10  # Marker at destination Point B
 
 ARUCO_DICT_TYPE = "DICT_4X4_50"  # Small dictionary, fast detection
-MARKER_SIZE = 0.32  # Physical marker side length in meters (8cm)
+MARKER_SIZE = 0.08  # Physical marker side length in meters (8cm)
 
 # =============================================================================
 # Camera Parameters
@@ -73,6 +73,7 @@ WAYPOINT_SEARCH_TIMEOUT = 15.0  # seconds
 TOF_TOPIC = "range_0"  # ToF sensor topic
 OBSTACLE_THRESHOLD = 0.50  # meters — trigger avoidance
 OBSTACLE_CLEAR_THRESHOLD = 0.80  # meters — safe to resume
+OBSTACLE_DEBOUNCE_COUNT = 3  # consecutive ToF readings required to change state
 STRAFE_DIRECTION = 1.0  # +1.0 = strafe left, -1.0 = strafe right
 STRAFE_DURATION = 1.5  # seconds to strafe before rechecking
 
@@ -97,9 +98,22 @@ SPEED_KP = 0.5  # linear.x = KP * distance (clamped)
 # Lateral error dead zone — don't steer if error is smaller than this
 STEER_DEADZONE = 0.02  # meters
 
-# Pre-approach strafe centering
-STRAFE_CENTER_DEADZONE = 0.10   # normalized h_err within this = marker is centered
-MARKER_CENTER_TIMEOUT  = 3.0    # seconds; give up centering and start approach anyway
+# Continuous object approach visual servoing
+APPROACH_CENTER_OK_H_ERR = 0.18
+APPROACH_RECENTER_H_ERR = 0.32
+APPROACH_CENTER_OK_LATERAL = 0.08
+APPROACH_STRAFE_KP = 0.25
+APPROACH_STRAFE_MAX_SPEED = 0.15
+APPROACH_STRAFE_SIGN = -1.0
+APPROACH_STRAFE_PROBE_TIME = 0.6
+APPROACH_STRAFE_PROBE_IMPROVE_EPS = 0.03
+APPROACH_YAW_KP = 0.6
+APPROACH_YAW_MAX_SPEED = 0.20
+APPROACH_YAW_SIGN = -1.0
+APPROACH_CREEP_SPEED = 0.08
+APPROACH_CLOSE_DISTANCE = 0.80
+APPROACH_CLOSE_MAX_SPEED = 0.12
+APPROACH_IGNORE_TOF_DISTANCE = 1.20
 
 # =============================================================================
 # Arm Positions (meters, relative to arm_base_link)

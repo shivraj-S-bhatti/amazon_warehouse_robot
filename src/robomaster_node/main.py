@@ -55,8 +55,8 @@ from config import (
     SEARCH_ROTATE_SPEED,
     # Timing
     CONTROL_LOOP_RATE,
-    # Pre-approach centering
-    MARKER_CENTER_TIMEOUT,
+    # Object approach
+    APPROACH_IGNORE_TOF_DISTANCE,
     # People bypass / avoidance
     BYPASS_FORWARD_SPEED,
     BYPASS_TURN_SPEED,
@@ -118,8 +118,6 @@ class StateMachine:
         self.bypass_direction = 1.0  # +1 = bypass left, -1 = bypass right
         self.accumulated_yaw = 0.0  # yaw accrued during moving-person avoidance
         self._people_loop_time = time.time()
-        self._approach_centered = False  # True once pre-approach strafe is done
-        self._centering_start = None     # time.time() when centering began
         self.running = True
 
         # ── Logging ──
@@ -151,8 +149,6 @@ class StateMachine:
             )
             self.chassis.stop()
             self.marker_last_seen_time = time.time()
-            self._approach_centered = False
-            self._centering_start = None
             return STATE_APPROACH_OBJECT
 
         # Rotate slowly to search
@@ -166,20 +162,8 @@ class StateMachine:
 
         if detection is None:
             self.chassis.stop()
-            # While centering: use the centering clock, not MARKER_LOST_TIMEOUT.
-            # Strafing keeps the marker in-frame, but brief losses still happen;
-            # don't let the 3s lost-timeout abort centering prematurely.
-            if not self._approach_centered and self._centering_start is not None:
-                if time.time() - self._centering_start >= MARKER_CENTER_TIMEOUT:
-                    self.logger.warn("Centering timed out (marker lost) — starting approach")
-                    self._approach_centered = True
-                    self._centering_start = None
-                return STATE_APPROACH_OBJECT
-            # Normal approach: use standard lost-timeout
             if time.time() - self.marker_last_seen_time > MARKER_LOST_TIMEOUT:
                 self.logger.warn("Object marker lost — returning to search")
-                self._approach_centered = False
-                self._centering_start = None
                 return STATE_SEARCH_OBJECT
             return STATE_APPROACH_OBJECT
 
@@ -233,7 +217,10 @@ class StateMachine:
         self.accumulated_yaw = 0.0  # fully clear once back on normal approach
 
         # ── ToF obstacle check ────────────────────────────────────────────
-        if self.obstacle.is_blocked():
+        if (
+            detection["distance"] > APPROACH_IGNORE_TOF_DISTANCE
+            and self.obstacle.is_blocked()
+        ):
             tof = self.obstacle.get_distance()
             if tof < detection["distance"] - 0.10:
                 self.logger.warn("Obstacle on approach to object!")
@@ -243,27 +230,14 @@ class StateMachine:
                 self.pre_avoid_state = STATE_APPROACH_OBJECT
                 return STATE_OBSTACLE_AVOID
 
-        # ── Pre-approach strafe centering ─────────────────────────────────
-        if not self._approach_centered:
-            if self._centering_start is None:
-                self._centering_start = time.time()
-
-            centered = self.chassis.strafe_to_center_marker(detection)
-            elapsed = time.time() - self._centering_start
-
-            if centered:
-                self.logger.info("Marker centred — starting approach")
-                self._approach_centered = True
-                self._centering_start = None
-            elif elapsed >= MARKER_CENTER_TIMEOUT:
-                self.logger.warn("Centering timed out — starting best-effort approach")
-                self._approach_centered = True
-                self._centering_start = None
-
-            return STATE_APPROACH_OBJECT
-
-        # ── Normal approach (marker already centred) ──────────────────────
-        self.chassis.drive_toward_marker(detection)
+        mode, forward, strafe, yaw = self.chassis.drive_toward_object_marker(detection)
+        self.logger.info(
+            f"Object approach {mode}: "
+            f"dist={detection['distance']:.2f}m, "
+            f"h_err={detection['horizontal_error']:+.3f}, "
+            f"lateral={detection['lateral']:+.3f}m, "
+            f"linear_x={forward:+.2f}, linear_y={strafe:+.2f}, angular_z={yaw:+.2f}"
+        )
         return STATE_APPROACH_OBJECT
 
     def handle_pick_up(self):

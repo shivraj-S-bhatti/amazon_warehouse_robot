@@ -23,6 +23,7 @@ from config import (
     TOF_TOPIC,
     OBSTACLE_THRESHOLD,
     OBSTACLE_CLEAR_THRESHOLD,
+    OBSTACLE_DEBOUNCE_COUNT,
 )
 
 
@@ -42,6 +43,9 @@ class ObstacleNode(Node):
         self._distance = float('inf')   # No reading yet = assume clear
         self._last_update = 0.0         # Timestamp of last reading
         self._sensor_active = False     # Have we received any data?
+        self._blocked_count = 0
+        self._clear_count = OBSTACLE_DEBOUNCE_COUNT
+        self._is_blocked = False
 
         # Subscribe to ToF sensor
         self.sub = self.create_subscription(
@@ -70,6 +74,16 @@ class ObstacleNode(Node):
             self._distance = distance
             self._last_update = time.time()
             self._sensor_active = True
+            if distance < OBSTACLE_THRESHOLD:
+                self._blocked_count += 1
+                self._clear_count = 0
+                if self._blocked_count >= OBSTACLE_DEBOUNCE_COUNT:
+                    self._is_blocked = True
+            elif distance >= OBSTACLE_CLEAR_THRESHOLD:
+                self._clear_count += 1
+                self._blocked_count = 0
+                if self._clear_count >= OBSTACLE_DEBOUNCE_COUNT:
+                    self._is_blocked = False
 
     # ─────────────────────────────────────────────────────────────
     # Public API
@@ -94,7 +108,7 @@ class ObstacleNode(Node):
             bool: True if an obstacle is closer than OBSTACLE_THRESHOLD.
         """
         with self.lock:
-            return self._distance < OBSTACLE_THRESHOLD
+            return self._is_blocked
 
     def is_clear(self):
         """
@@ -107,7 +121,7 @@ class ObstacleNode(Node):
             bool: True if no obstacle within OBSTACLE_CLEAR_THRESHOLD.
         """
         with self.lock:
-            return self._distance >= OBSTACLE_CLEAR_THRESHOLD
+            return not self._is_blocked
 
     def is_sensor_active(self):
         """

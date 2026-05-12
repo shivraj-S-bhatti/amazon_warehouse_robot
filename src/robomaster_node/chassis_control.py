@@ -25,18 +25,31 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import ColorRGBA
-import math
+import time
 
 from config import (
     SEARCH_ROTATE_SPEED,
     APPROACH_MAX_SPEED,
     APPROACH_MIN_SPEED,
-    STRAFE_SPEED,
     NAVIGATE_SPEED,
     STEER_KP,
     SPEED_KP,
     STEER_DEADZONE,
-    STRAFE_CENTER_DEADZONE,
+    STRAFE_SPEED,
+    APPROACH_CENTER_OK_H_ERR,
+    APPROACH_RECENTER_H_ERR,
+    APPROACH_CENTER_OK_LATERAL,
+    APPROACH_STRAFE_KP,
+    APPROACH_STRAFE_MAX_SPEED,
+    APPROACH_STRAFE_SIGN,
+    APPROACH_STRAFE_PROBE_TIME,
+    APPROACH_STRAFE_PROBE_IMPROVE_EPS,
+    APPROACH_YAW_KP,
+    APPROACH_YAW_MAX_SPEED,
+    APPROACH_YAW_SIGN,
+    APPROACH_CREEP_SPEED,
+    APPROACH_CLOSE_DISTANCE,
+    APPROACH_CLOSE_MAX_SPEED,
     LED_SEARCHING,
     LED_APPROACHING,
     LED_PICKING,
@@ -59,6 +72,9 @@ class ChassisController(Node):
         # Publishers
         self.cmd_pub = self.create_publisher(Twist, 'cmd_vel', 10)
         self.led_pub = self.create_publisher(ColorRGBA, 'leds/color', 10)
+        self._object_strafe_sign = APPROACH_STRAFE_SIGN
+        self._object_probe_start_time = None
+        self._object_probe_start_h_err = None
 
         self.get_logger().info('ChassisController initialized')
 
@@ -172,27 +188,92 @@ class ChassisController(Node):
 
         return (forward_speed, angular_z)
 
-    def strafe_to_center_marker(self, detection):
+    def drive_toward_object_marker(self, detection):
         """
-        Strafe sideways (no forward motion, no yaw) to centre the marker
-        horizontally in the camera frame.
+        Continuously approach the object marker while keeping it centered.
+
+        Uses strafe as the primary correction from frame-space error. Coarse
+        errors stop forward motion; moderate errors creep forward; centered
+        detections approach normally with small strafe and yaw correction.
 
         Args:
             detection (dict): Detection from VisionNode.get_marker().
 
         Returns:
-            bool: True when the marker is within STRAFE_CENTER_DEADZONE.
+            tuple: (mode, forward_speed, strafe_speed, yaw_speed)
         """
-        h_err = detection['horizontal_error']  # -1 (left) to +1 (right)
+        h_err = detection["horizontal_error"]  # -1 (left) to +1 (right)
+        lateral = detection["lateral"]         # meters, + = right of center
+        distance = detection["distance"]       # meters ahead
 
-        if abs(h_err) <= STRAFE_CENTER_DEADZONE:
-            self.stop()
-            return True
+        abs_h_err = abs(h_err)
+        abs_lateral = abs(lateral)
+        strafe = self._object_strafe_sign * h_err * APPROACH_STRAFE_KP
+        strafe = max(-APPROACH_STRAFE_MAX_SPEED, min(APPROACH_STRAFE_MAX_SPEED, strafe))
 
-        # marker right (h_err > 0) → strafe right (negative linear_y)
-        linear_y = max(-STRAFE_SPEED, min(STRAFE_SPEED, -h_err * STRAFE_SPEED))
-        self.move(linear_x=0.0, linear_y=linear_y, angular_z=0.0)
-        return False
+        if abs_h_err >= APPROACH_RECENTER_H_ERR:
+            self._update_object_strafe_probe(abs_h_err)
+            strafe = self._object_strafe_sign * h_err * APPROACH_STRAFE_KP
+            strafe = max(
+                -APPROACH_STRAFE_MAX_SPEED,
+                min(APPROACH_STRAFE_MAX_SPEED, strafe),
+            )
+            self.move(linear_x=0.0, linear_y=strafe, angular_z=0.0)
+            return ("recenter", 0.0, strafe, 0.0)
+
+        self._reset_object_strafe_probe()
+
+        if (
+            abs_h_err > APPROACH_CENTER_OK_H_ERR
+            or abs_lateral > APPROACH_CENTER_OK_LATERAL
+        ):
+            self.move(linear_x=APPROACH_CREEP_SPEED, linear_y=strafe, angular_z=0.0)
+            return ("creep", APPROACH_CREEP_SPEED, strafe, 0.0)
+
+        approach_speed = APPROACH_MAX_SPEED
+        if distance < APPROACH_CLOSE_DISTANCE:
+            approach_speed = min(approach_speed, APPROACH_CLOSE_MAX_SPEED)
+
+        forward_speed = SPEED_KP * distance
+        forward_speed = max(APPROACH_MIN_SPEED, min(approach_speed, forward_speed))
+
+        if abs_h_err < STEER_DEADZONE:
+            angular_z = 0.0
+        else:
+            angular_z = APPROACH_YAW_SIGN * APPROACH_YAW_KP * h_err
+            angular_z = max(
+                -APPROACH_YAW_MAX_SPEED,
+                min(APPROACH_YAW_MAX_SPEED, angular_z),
+            )
+
+        self.move(linear_x=forward_speed, linear_y=strafe, angular_z=angular_z)
+        return ("approach", forward_speed, strafe, angular_z)
+
+    def _update_object_strafe_probe(self, abs_h_err):
+        now = time.time()
+        if self._object_probe_start_time is None:
+            self._object_probe_start_time = now
+            self._object_probe_start_h_err = abs_h_err
+            return
+
+        elapsed = now - self._object_probe_start_time
+        if elapsed < APPROACH_STRAFE_PROBE_TIME:
+            return
+
+        improvement = self._object_probe_start_h_err - abs_h_err
+        if improvement < APPROACH_STRAFE_PROBE_IMPROVE_EPS:
+            self._object_strafe_sign *= -1.0
+            self.get_logger().warn(
+                "Object strafe probe did not reduce frame error; "
+                f"flipping strafe sign to {self._object_strafe_sign:+.0f}"
+            )
+
+        self._object_probe_start_time = now
+        self._object_probe_start_h_err = abs_h_err
+
+    def _reset_object_strafe_probe(self):
+        self._object_probe_start_time = None
+        self._object_probe_start_h_err = None
 
     def align_to_marker(self, detection):
         """
