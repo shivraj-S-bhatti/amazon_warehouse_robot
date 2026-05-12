@@ -37,15 +37,17 @@ from config import (
     BLIND_APPROACH_THRESHOLD, APPROACH_MIN_SPEED,
     RECENTER_YAW_THRESHOLD, RECENTER_YAW_SPEED,
     RECENTER_STRAFE_THRESHOLD, RECENTER_STRAFE_SPEED, RECENTER_SETTLED_COUNT,
-    # Obstacle
-    STRAFE_DIRECTION, STRAFE_DURATION,
     # Speeds
     SEARCH_ROTATE_SPEED,
     # Timing
     CONTROL_LOOP_RATE,
-    # People bypass / avoidance
-    BYPASS_FORWARD_SPEED, BYPASS_TURN_SPEED, BYPASS_CURVE_TIME, BYPASS_STRAIGHT_TIME,
+    # Moving-person avoidance (in-place steering)
+    BYPASS_FORWARD_SPEED, BYPASS_TURN_SPEED,
     AVOID_TURN_SPEED,
+    # U-shape detour around stationary obstacles
+    DETOUR_STRAFE_SPEED, DETOUR_STRAFE_DURATION,
+    DETOUR_FORWARD_SPEED, DETOUR_FORWARD_DURATION,
+    DETOUR_DEFAULT_DIR,
 )
 
 from vision import VisionNode
@@ -84,15 +86,17 @@ class StateMachine:
         self.state = STATE_SEARCH_OBJECT
         self.current_waypoint_index = 0
         self.marker_last_seen_time = time.time()
-        self.avoid_start_time = 0.0
-        self.avoid_nudge_count = 0
         self.pre_avoid_state = STATE_NAVIGATE
         self.waypoint_search_start = None
-        self.bypass_start_time = 0.0
-        self.bypass_direction = 1.0       # +1 = bypass left, -1 = bypass right
         self.accumulated_yaw = 0.0        # yaw accrued during moving-person avoidance
         self._people_loop_time = time.time()
         self.running = True
+
+        # ── U-shape detour bookkeeping ──
+        # detour_direction: +1 = strafe LEFT first, -1 = strafe RIGHT first.
+        # Chosen at the moment the obstacle is detected (see transitions).
+        self.detour_direction = DETOUR_DEFAULT_DIR
+        self.detour_start_time = 0.0
 
         # Recentering sub-state ('yaw' → 'strafe' → settled)
         self._recenter_phase   = 'yaw'
@@ -258,13 +262,18 @@ class StateMachine:
             return STATE_APPROACH_OBJECT
 
         if person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
-            self.logger.warn('Stationary person blocking path — initiating S-curve bypass')
-            self.chassis.stop()
-            self.bypass_start_time = time.time()
             person_cx = self.people.get_person_cx()
-            self.bypass_direction = 1.0 if person_cx > 0.5 else -1.0
+            # Detour AWAY from the person: if they are on the right half of
+            # the frame (cx > 0.5) strafe LEFT (+1), and vice versa.
+            self.detour_direction = 1.0 if person_cx > 0.5 else -1.0
+            self.logger.warn(
+                f'Stationary person blocking path (cx={person_cx:.2f}) — '
+                f'initiating U-detour {"LEFT" if self.detour_direction > 0 else "RIGHT"}'
+            )
+            self.chassis.stop()
+            self.detour_start_time = time.time()
             self.pre_avoid_state = STATE_APPROACH_OBJECT
-            return STATE_BYPASS_OBSTACLE
+            return STATE_OBSTACLE_AVOID
 
         if abs(self.accumulated_yaw) > 0.02:
             correction = -BYPASS_TURN_SPEED if self.accumulated_yaw > 0 else BYPASS_TURN_SPEED
@@ -283,10 +292,22 @@ class StateMachine:
         if self.obstacle.is_blocked():
             tof = self.obstacle.get_distance()
             if tof < detection['distance'] - 0.10:
-                self.logger.warn('Obstacle on approach to object!')
+                # Pick a detour side that keeps the (still-visible) marker
+                # on the inside of the U: if the marker sits left of centre
+                # (horizontal_error < 0) detour RIGHT, and vice versa, so
+                # the strafe-back leg ends up pointing the camera at the
+                # marker again. Fall back to DETOUR_DEFAULT_DIR otherwise.
+                h_err = detection.get('horizontal_error', 0.0)
+                if abs(h_err) > 0.05:
+                    self.detour_direction = -1.0 if h_err < 0 else 1.0
+                else:
+                    self.detour_direction = DETOUR_DEFAULT_DIR
+                self.logger.warn(
+                    f'Obstacle on approach to object (tof={tof:.2f}m) — '
+                    f'initiating U-detour {"LEFT" if self.detour_direction > 0 else "RIGHT"}'
+                )
                 self.chassis.stop()
-                self.avoid_start_time = time.time()
-                self.avoid_nudge_count = 0
+                self.detour_start_time = time.time()
                 self.pre_avoid_state = STATE_APPROACH_OBJECT
                 return STATE_OBSTACLE_AVOID
 
@@ -358,13 +379,16 @@ class StateMachine:
             return STATE_NAVIGATE
 
         if person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
-            self.logger.warn('Stationary person blocking path — initiating S-curve bypass')
-            self.chassis.stop()
-            self.bypass_start_time = time.time()
             person_cx = self.people.get_person_cx()
-            self.bypass_direction = 1.0 if person_cx > 0.5 else -1.0
+            self.detour_direction = 1.0 if person_cx > 0.5 else -1.0
+            self.logger.warn(
+                f'Stationary person blocking path (cx={person_cx:.2f}) — '
+                f'initiating U-detour {"LEFT" if self.detour_direction > 0 else "RIGHT"}'
+            )
+            self.chassis.stop()
+            self.detour_start_time = time.time()
             self.pre_avoid_state = STATE_NAVIGATE
-            return STATE_BYPASS_OBSTACLE
+            return STATE_OBSTACLE_AVOID
 
         if abs(self.accumulated_yaw) > 0.02:
             correction = -BYPASS_TURN_SPEED if self.accumulated_yaw > 0 else BYPASS_TURN_SPEED
@@ -379,12 +403,22 @@ class StateMachine:
 
         self.accumulated_yaw = 0.0
 
-        # TOF obstacle check is also runtime-independent of marker visibility.
+        # TOF obstacle check is runtime-independent of marker visibility.
         if self.obstacle.is_blocked():
-            self.logger.warn(f'Obstacle during navigation to waypoint {current_marker_id}!')
+            # If the waypoint is currently visible, use its horizontal_error
+            # to pick the detour side that keeps the marker on the inside of
+            # the U. Otherwise fall back to DETOUR_DEFAULT_DIR.
+            peek = self.vision.get_marker(current_marker_id)
+            if peek is not None and abs(peek.get('horizontal_error', 0.0)) > 0.05:
+                self.detour_direction = -1.0 if peek['horizontal_error'] < 0 else 1.0
+            else:
+                self.detour_direction = DETOUR_DEFAULT_DIR
+            self.logger.warn(
+                f'Obstacle during navigation to waypoint {current_marker_id} — '
+                f'initiating U-detour {"LEFT" if self.detour_direction > 0 else "RIGHT"}'
+            )
             self.chassis.stop()
-            self.avoid_start_time = time.time()
-            self.avoid_nudge_count = 0
+            self.detour_start_time = time.time()
             self.pre_avoid_state = STATE_NAVIGATE
             return STATE_OBSTACLE_AVOID
 
@@ -422,76 +456,64 @@ class StateMachine:
         return STATE_NAVIGATE
 
     def handle_obstacle_avoid(self):
+        """
+        U-shape detour around a stationary obstacle (person or non-person).
+
+        Three pure-translation phases — no rotation, so the robot's heading
+        stays locked on the original line of travel. When phase 3 ends the
+        robot is back on that same heading line at a point further along,
+        where the marker should be re-acquired without spinning to search.
+
+          Phase 1 — STRAFE_OUT:  slide laterally to clear the obstacle width.
+          Phase 2 — FORWARD:     drive forward to pass the obstacle's depth.
+          Phase 3 — STRAFE_BACK: slide back the same offset onto the line.
+        """
         self.chassis.set_led_avoiding()
 
-        if self.obstacle.is_clear():
-            self.logger.info(f'Path clear — returning to {self.pre_avoid_state}')
-            self.chassis.stop()
-            time.sleep(0.3)
-            self.marker_last_seen_time = time.time()
-            return self.pre_avoid_state
+        side    = self.detour_direction
+        elapsed = time.time() - self.detour_start_time
+        p1_end  = DETOUR_STRAFE_DURATION
+        p2_end  = p1_end + DETOUR_FORWARD_DURATION
+        p3_end  = p2_end + DETOUR_STRAFE_DURATION
 
-        elapsed = time.time() - self.avoid_start_time
-        if elapsed > STRAFE_DURATION * 3:
-            if self.avoid_nudge_count >= 3:
-                self.logger.warn('Obstacle not clearing after 3 nudges — resuming')
-                self.avoid_nudge_count = 0
-                self.chassis.stop()
-                self.marker_last_seen_time = time.time()
-                return self.pre_avoid_state
-            self.chassis.move_forward(0.1)
-            time.sleep(0.5)
-            self.chassis.stop()
-            self.avoid_nudge_count += 1
-            self.avoid_start_time = time.time()
+        # ── Phase 1: strafe outward ──
+        if elapsed < p1_end:
+            self.chassis.move(linear_y=side * DETOUR_STRAFE_SPEED)
             return STATE_OBSTACLE_AVOID
 
-        if STRAFE_DIRECTION > 0:
-            self.chassis.strafe_left()
-        else:
-            self.chassis.strafe_right()
+        # ── Phase 2: forward leg past the obstacle ──
+        if elapsed < p2_end:
+            # If a *new* obstacle appears in front mid-detour, restart the
+            # U from STRAFE_OUT in the same direction so we don't drive
+            # straight into it.
+            if self.obstacle.is_blocked():
+                self.logger.warn('Second obstacle mid-detour — extending the U')
+                self.detour_start_time = time.time()
+                return STATE_OBSTACLE_AVOID
+            self.chassis.move(linear_x=DETOUR_FORWARD_SPEED)
+            return STATE_OBSTACLE_AVOID
 
-        return STATE_OBSTACLE_AVOID
+        # ── Phase 3: strafe back to the original heading line ──
+        if elapsed < p3_end:
+            self.chassis.move(linear_y=-side * DETOUR_STRAFE_SPEED)
+            return STATE_OBSTACLE_AVOID
+
+        # ── Detour complete: rejoin the original heading line ──
+        self.chassis.stop()
+        self.people.notify_bypass_complete()
+        # Reset the marker-lost timers so the resumed state doesn't
+        # immediately spin-search just because the marker wasn't visible
+        # while we were strafing.
+        self.marker_last_seen_time = time.time()
+        self.waypoint_search_start = None
+        self._reset_recenter()
+        resume_state = self.pre_avoid_state or STATE_NAVIGATE
+        self.logger.info(f'U-detour complete — resuming {resume_state}')
+        return resume_state
 
     def handle_bypass_obstacle(self):
-        self.chassis.set_led_avoiding()
-
-        # During the bypass arc, if the ToF sees something dead-ahead
-        # (e.g. another obstacle along the curve), abort the bypass and
-        # fall through to in-place obstacle avoidance for safety.
-        if self.obstacle.is_blocked():
-            self.logger.warn('Obstacle detected mid-bypass — aborting S-curve')
-            self.chassis.stop()
-            self.avoid_start_time = time.time()
-            self.avoid_nudge_count = 0
-            # Keep pre_avoid_state pointed at the original travelling state so
-            # the robot resumes the correct task after avoidance clears.
-            return STATE_OBSTACLE_AVOID
-
-        elapsed = time.time() - self.bypass_start_time
-        p1_end  = BYPASS_CURVE_TIME
-        p2_end  = p1_end + BYPASS_STRAIGHT_TIME
-        p3_end  = p2_end + BYPASS_CURVE_TIME
-
-        if elapsed < p1_end:
-            self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=self.bypass_direction * BYPASS_TURN_SPEED)
-        elif elapsed < p2_end:
-            self.chassis.move(linear_x=BYPASS_FORWARD_SPEED)
-        elif elapsed < p3_end:
-            self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=-self.bypass_direction * BYPASS_TURN_SPEED)
-        else:
-            self.chassis.stop()
-            self.people.notify_bypass_complete()
-            self.marker_last_seen_time = time.time()
-            # Reset recentering so the resumed approach state re-aligns to the
-            # marker from scratch after the lateral offset introduced by the
-            # S-curve.
-            self._reset_recenter()
-            resume_state = self.pre_avoid_state or STATE_NAVIGATE
-            self.logger.info(f'Bypass complete — resuming {resume_state}')
-            return resume_state
-
-        return STATE_BYPASS_OBSTACLE
+        # Legacy state name kept for backward compatibility — same U-detour.
+        return self.handle_obstacle_avoid()
 
     def handle_search_dest(self):
         self.chassis.set_led_searching()
@@ -573,13 +595,16 @@ class StateMachine:
             return STATE_APPROACH_DEST
 
         if person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
-            self.logger.warn('Stationary person blocking path to destination — initiating S-curve bypass')
-            self.chassis.stop()
-            self.bypass_start_time = time.time()
             person_cx = self.people.get_person_cx()
-            self.bypass_direction = 1.0 if person_cx > 0.5 else -1.0
+            self.detour_direction = 1.0 if person_cx > 0.5 else -1.0
+            self.logger.warn(
+                f'Stationary person blocking path to destination (cx={person_cx:.2f}) — '
+                f'initiating U-detour {"LEFT" if self.detour_direction > 0 else "RIGHT"}'
+            )
+            self.chassis.stop()
+            self.detour_start_time = time.time()
             self.pre_avoid_state = STATE_APPROACH_DEST
-            return STATE_BYPASS_OBSTACLE
+            return STATE_OBSTACLE_AVOID
 
         if abs(self.accumulated_yaw) > 0.02:
             correction = -BYPASS_TURN_SPEED if self.accumulated_yaw > 0 else BYPASS_TURN_SPEED
@@ -597,12 +622,18 @@ class StateMachine:
         # ── 3. TOF OBSTACLE CHECK ──
         if self.obstacle.is_blocked():
             tof = self.obstacle.get_distance()
-            if tof >= detection['distance'] - 0.10:
-                pass  # Ignore destination marker
-            else:
+            if tof < detection['distance'] - 0.10:
+                h_err = detection.get('horizontal_error', 0.0)
+                if abs(h_err) > 0.05:
+                    self.detour_direction = -1.0 if h_err < 0 else 1.0
+                else:
+                    self.detour_direction = DETOUR_DEFAULT_DIR
+                self.logger.warn(
+                    f'Obstacle on approach to destination (tof={tof:.2f}m) — '
+                    f'initiating U-detour {"LEFT" if self.detour_direction > 0 else "RIGHT"}'
+                )
                 self.chassis.stop()
-                self.avoid_start_time = time.time()
-                self.avoid_nudge_count = 0
+                self.detour_start_time = time.time()
                 self.pre_avoid_state = STATE_APPROACH_DEST
                 return STATE_OBSTACLE_AVOID
 

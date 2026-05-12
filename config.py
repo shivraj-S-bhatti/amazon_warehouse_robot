@@ -144,6 +144,27 @@ BYPASS_STRAIGHT_TIME = 2.5          # seconds for the straight phase
 
 # Dynamic (moving-person) avoidance turn speed — gentler than bypass S-curve
 AVOID_TURN_SPEED     = 0.4          # rad/s while sidestepping a moving person
+
+# =============================================================================
+# U-Shape Detour (around a stationary obstacle — person or non-person)
+# =============================================================================
+# Pure-translation maneuver — no rotation, so the robot heading stays locked
+# to the original line of travel. When the detour completes the robot has
+# rejoined the same heading line at a point further along, where the marker
+# should be re-acquired without any spin-search.
+#
+#   Phase 1 — STRAFE_OUT:  slide laterally for DETOUR_STRAFE_DURATION
+#                          (lateral offset ≈ speed × duration).
+#   Phase 2 — FORWARD:     drive forward for DETOUR_FORWARD_DURATION
+#                          to pass the obstacle's depth.
+#   Phase 3 — STRAFE_BACK: slide back the same offset to rejoin the line.
+DETOUR_STRAFE_SPEED     = 0.18      # m/s lateral speed during strafe legs
+DETOUR_STRAFE_DURATION  = 1.8       # s   → ~0.32 m lateral offset
+DETOUR_FORWARD_SPEED    = 0.20      # m/s forward speed during middle leg
+DETOUR_FORWARD_DURATION = 2.5       # s   → ~0.50 m past the obstacle
+DETOUR_DEFAULT_DIR      = 1.0       # +1 = detour LEFT, -1 = detour RIGHT
+                                    # (used when obstacle side is unknown,
+                                    #  e.g. a ToF-only detection)
 # =============================================================================
 # Recentering — two-phase yaw → strafe alignment before advancing
 # =============================================================================
