@@ -262,7 +262,8 @@ class StateMachine:
             self.chassis.stop()
             self.bypass_start_time = time.time()
             person_cx = self.people.get_person_cx()
-            self.bypass_direction = 1.0 if person_cx > 0.5 else -1.0 
+            self.bypass_direction = 1.0 if person_cx > 0.5 else -1.0
+            self.pre_avoid_state = STATE_APPROACH_OBJECT
             return STATE_BYPASS_OBSTACLE
 
         if abs(self.accumulated_yaw) > 0.02:
@@ -321,40 +322,19 @@ class StateMachine:
             return STATE_SEARCH_DEST
 
         current_marker_id = WAYPOINT_MARKER_IDS[self.current_waypoint_index]
+
+        # Early exit if destination marker becomes visible
         dest_detection = self.vision.get_marker(DEST_MARKER_ID)
-        
         if dest_detection is not None:
             self.logger.info('Destination marker visible — skipping remaining waypoints')
             self.chassis.stop()
             self.marker_last_seen_time = time.time()
             return STATE_APPROACH_DEST
 
-        detection = self.vision.get_marker(current_marker_id)
-
-        if detection is None:
-            if time.time() - self.marker_last_seen_time > MARKER_LOST_TIMEOUT:
-                if self.waypoint_search_start is None:
-                    self.waypoint_search_start = time.time()
-                    self.logger.info(f'Waypoint {current_marker_id} lost — rotating to search')
-                elif time.time() - self.waypoint_search_start > WAYPOINT_SEARCH_TIMEOUT:
-                    self.logger.warn(f'Waypoint {current_marker_id} not found after {WAYPOINT_SEARCH_TIMEOUT}s — skipping')
-                    self.current_waypoint_index += 1
-                    self.waypoint_search_start = None
-                    self.marker_last_seen_time = time.time()
-                    return STATE_NAVIGATE
-                self.chassis.rotate(SEARCH_ROTATE_SPEED)
-            return STATE_NAVIGATE
-
-        self.marker_last_seen_time = time.time()
-        self.waypoint_search_start = None
-
-        if detection['distance'] < WAYPOINT_SWITCH_DISTANCE:
-            self.logger.info(f'Waypoint {current_marker_id} reached')
-            self.current_waypoint_index += 1
-            self.marker_last_seen_time = time.time()
-            return STATE_NAVIGATE
-
-        # ── PEOPLE AVOIDANCE DURING NAVIGATION ──
+        # ── PEOPLE / OBSTACLE AVOIDANCE (always active during navigation) ──
+        # Run these checks BEFORE the marker check so the robot reacts to
+        # people/obstacles even if the waypoint is momentarily out of frame
+        # (e.g. occluded by the person who just stepped in front of it).
         now = time.time()
         dt = now - self._people_loop_time
         self._people_loop_time = now
@@ -371,6 +351,10 @@ class StateMachine:
                 angular_z = AVOID_TURN_SPEED if person_cx > 0.5 else -AVOID_TURN_SPEED
             self.accumulated_yaw += angular_z * dt
             self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=angular_z)
+            self.logger.info(
+                f'Navigate: moving person (cx={person_cx:.2f}, vel={vel:+.3f}) '
+                f'— turning {"left" if angular_z > 0 else "right"}'
+            )
             return STATE_NAVIGATE
 
         if person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
@@ -378,7 +362,8 @@ class StateMachine:
             self.chassis.stop()
             self.bypass_start_time = time.time()
             person_cx = self.people.get_person_cx()
-            self.bypass_direction = 1.0 if person_cx > 0.5 else -1.0 
+            self.bypass_direction = 1.0 if person_cx > 0.5 else -1.0
+            self.pre_avoid_state = STATE_NAVIGATE
             return STATE_BYPASS_OBSTACLE
 
         if abs(self.accumulated_yaw) > 0.02:
@@ -394,7 +379,7 @@ class StateMachine:
 
         self.accumulated_yaw = 0.0
 
-        # ── TOF OBSTACLE CHECK DURING NAVIGATION ──
+        # TOF obstacle check is also runtime-independent of marker visibility.
         if self.obstacle.is_blocked():
             self.logger.warn(f'Obstacle during navigation to waypoint {current_marker_id}!')
             self.chassis.stop()
@@ -402,6 +387,36 @@ class StateMachine:
             self.avoid_nudge_count = 0
             self.pre_avoid_state = STATE_NAVIGATE
             return STATE_OBSTACLE_AVOID
+
+        # ── MARKER-BASED NAVIGATION ──
+        detection = self.vision.get_marker(current_marker_id)
+
+        if detection is None:
+            if time.time() - self.marker_last_seen_time > MARKER_LOST_TIMEOUT:
+                if self.waypoint_search_start is None:
+                    self.waypoint_search_start = time.time()
+                    self.logger.info(f'Waypoint {current_marker_id} lost — rotating to search')
+                elif time.time() - self.waypoint_search_start > WAYPOINT_SEARCH_TIMEOUT:
+                    self.logger.warn(f'Waypoint {current_marker_id} not found after {WAYPOINT_SEARCH_TIMEOUT}s — skipping')
+                    self.current_waypoint_index += 1
+                    self.waypoint_search_start = None
+                    self.marker_last_seen_time = time.time()
+                    return STATE_NAVIGATE
+                self.chassis.rotate(SEARCH_ROTATE_SPEED)
+            else:
+                # Within the brief grace period: pause forward motion instead
+                # of coasting blindly with the previous velocity command.
+                self.chassis.stop()
+            return STATE_NAVIGATE
+
+        self.marker_last_seen_time = time.time()
+        self.waypoint_search_start = None
+
+        if detection['distance'] < WAYPOINT_SWITCH_DISTANCE:
+            self.logger.info(f'Waypoint {current_marker_id} reached')
+            self.current_waypoint_index += 1
+            self.marker_last_seen_time = time.time()
+            return STATE_NAVIGATE
 
         self.chassis.navigate_toward_marker(detection)
         return STATE_NAVIGATE
@@ -441,6 +456,18 @@ class StateMachine:
     def handle_bypass_obstacle(self):
         self.chassis.set_led_avoiding()
 
+        # During the bypass arc, if the ToF sees something dead-ahead
+        # (e.g. another obstacle along the curve), abort the bypass and
+        # fall through to in-place obstacle avoidance for safety.
+        if self.obstacle.is_blocked():
+            self.logger.warn('Obstacle detected mid-bypass — aborting S-curve')
+            self.chassis.stop()
+            self.avoid_start_time = time.time()
+            self.avoid_nudge_count = 0
+            # Keep pre_avoid_state pointed at the original travelling state so
+            # the robot resumes the correct task after avoidance clears.
+            return STATE_OBSTACLE_AVOID
+
         elapsed = time.time() - self.bypass_start_time
         p1_end  = BYPASS_CURVE_TIME
         p2_end  = p1_end + BYPASS_STRAIGHT_TIME
@@ -456,8 +483,13 @@ class StateMachine:
             self.chassis.stop()
             self.people.notify_bypass_complete()
             self.marker_last_seen_time = time.time()
-            self.logger.info('Bypass complete — resuming pre-avoidance state')
-            return STATE_APPROACH_OBJECT 
+            # Reset recentering so the resumed approach state re-aligns to the
+            # marker from scratch after the lateral offset introduced by the
+            # S-curve.
+            self._reset_recenter()
+            resume_state = self.pre_avoid_state or STATE_NAVIGATE
+            self.logger.info(f'Bypass complete — resuming {resume_state}')
+            return resume_state
 
         return STATE_BYPASS_OBSTACLE
 
@@ -541,10 +573,12 @@ class StateMachine:
             return STATE_APPROACH_DEST
 
         if person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
+            self.logger.warn('Stationary person blocking path to destination — initiating S-curve bypass')
             self.chassis.stop()
             self.bypass_start_time = time.time()
             person_cx = self.people.get_person_cx()
-            self.bypass_direction = 1.0 if person_cx > 0.5 else -1.0 
+            self.bypass_direction = 1.0 if person_cx > 0.5 else -1.0
+            self.pre_avoid_state = STATE_APPROACH_DEST
             return STATE_BYPASS_OBSTACLE
 
         if abs(self.accumulated_yaw) > 0.02:
