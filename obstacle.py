@@ -1,7 +1,7 @@
 """
 obstacle.py — ToF sensor-based obstacle detection.
 
-Subscribes to the EP Core's Time-of-Flight distance sensor and provides
+Subscribes to the EP Core's forward Time-of-Flight distance sensor and provides
 a simple API for checking if the path ahead is blocked.
 
 Usage:
@@ -21,17 +21,14 @@ import time
 
 from config import (
     TOF_TOPIC,
-    TOF_LEFT_TOPIC,
-    TOF_RIGHT_TOPIC,
     OBSTACLE_THRESHOLD,
     OBSTACLE_CLEAR_THRESHOLD,
-    DETOUR_SIDE_CLEAR_THRESHOLD,
 )
 
 
 class ObstacleNode(Node):
     """
-    ROS 2 node that monitors the ToF distance sensor for obstacles.
+    ROS 2 node that monitors the forward ToF distance sensor for obstacles.
 
     The ToF sensor gives a single distance reading (in meters) in the
     direction it's pointing. On the EP Core, it faces forward.
@@ -47,23 +44,12 @@ class ObstacleNode(Node):
         self._last_update   = 0.0
         self._sensor_active = False
 
-        # Side TOFs — float('inf') until first reading; _active guards usage
-        self._left_distance  = float('inf')
-        self._right_distance = float('inf')
-        self._left_active    = False
-        self._right_active   = False
+        self.sub = self.create_subscription(Range, TOF_TOPIC, self._range_callback, 10)
 
-        self.sub       = self.create_subscription(Range, TOF_TOPIC,       self._range_callback, 10)
-        self.left_sub  = self.create_subscription(Range, TOF_LEFT_TOPIC,  self._left_callback,  10)
-        self.right_sub = self.create_subscription(Range, TOF_RIGHT_TOPIC, self._right_callback, 10)
-
-        self.get_logger().info(
-            f'ObstacleNode initialized — forward={TOF_TOPIC} '
-            f'left={TOF_LEFT_TOPIC} right={TOF_RIGHT_TOPIC}')
+        self.get_logger().info(f'ObstacleNode initialized — forward={TOF_TOPIC}')
         self.get_logger().info(
             f'  Obstacle threshold: {OBSTACLE_THRESHOLD}m, '
-            f'Clear threshold: {OBSTACLE_CLEAR_THRESHOLD}m, '
-            f'Side-clear threshold: {DETOUR_SIDE_CLEAR_THRESHOLD}m')
+            f'Clear threshold: {OBSTACLE_CLEAR_THRESHOLD}m')
 
     # ─────────────────────────────────────────────────────────────
     # ToF callbacks
@@ -87,22 +73,6 @@ class ObstacleNode(Node):
             self._distance = d
             self._last_update = time.time()
             self._sensor_active = True
-
-    def _left_callback(self, msg):
-        d = self._parse_range(msg)
-        if d is None:
-            return
-        with self.lock:
-            self._left_distance = d
-            self._left_active = True
-
-    def _right_callback(self, msg):
-        d = self._parse_range(msg)
-        if d is None:
-            return
-        with self.lock:
-            self._right_distance = d
-            self._right_active = True
 
     # ─────────────────────────────────────────────────────────────
     # Public API
@@ -152,36 +122,6 @@ class ObstacleNode(Node):
         with self.lock:
             return self._sensor_active
 
-    def get_left_distance(self) -> float:
-        """Distance reading from the left side ToF (float('inf') if no data)."""
-        with self.lock:
-            return self._left_distance
-
-    def get_right_distance(self) -> float:
-        """Distance reading from the right side ToF (float('inf') if no data)."""
-        with self.lock:
-            return self._right_distance
-
-    def is_detour_side_clear(self, detour_direction: float) -> bool:
-        """
-        During the U-detour forward leg, return True when the obstacle (which
-        sits on the side opposite to the strafe direction) is no longer beside
-        the robot.
-
-        detour_direction: +1.0 = robot strafed LEFT  → obstacle is on the RIGHT
-                          -1.0 = robot strafed RIGHT → obstacle is on the LEFT
-
-        Returns False if the relevant side sensor has not yet received any data,
-        so an inactive sensor never falsely signals 'clear'.
-        """
-        with self.lock:
-            if detour_direction > 0:
-                # Strafed left — check right side TOF
-                return self._right_active and self._right_distance > DETOUR_SIDE_CLEAR_THRESHOLD
-            else:
-                # Strafed right — check left side TOF
-                return self._left_active and self._left_distance > DETOUR_SIDE_CLEAR_THRESHOLD
-
     def get_time_since_update(self):
         """
         Get seconds since the last ToF reading.
@@ -204,9 +144,7 @@ def main():
     Test the obstacle node standalone.
     Place objects in front of the ToF sensor and see distance readings.
 
-    Note: Make sure the ToF module is enabled in your config.yaml:
-        tof:
-          enabled: true
+    Note: Make sure the ToF module is enabled in your launch command.
 
     Usage:
         # Terminal 1: launch driver
@@ -224,7 +162,7 @@ def main():
 
         if not active:
             node.get_logger().warn(
-                'No ToF data received yet — is tof.enabled: true in config?')
+                'No ToF data received yet — is tof_0:=True in launch command?')
         else:
             status = "BLOCKED" if blocked else "CLEAR"
             node.get_logger().info(

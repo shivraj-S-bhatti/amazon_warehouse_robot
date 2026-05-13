@@ -88,12 +88,22 @@ class PeopleAvoidanceNode(Node):
     # ── Callbacks ─────────────────────────────────────────────────────────
 
     def _vision_cb(self, msg: Detection):
+        # FIX: Do NOT immediately clear state on empty or below-threshold frames.
+        #
+        # people_avoidance.py subscribes to the raw /vision topic, which fires on
+        # every camera frame — including frames where the person was momentarily
+        # missed by the detector (common during fast movement).  Clearing the
+        # velocity history and state on a single empty frame destroys the MOVING
+        # classification mid-dodge and prevents correct avoidance.
+        #
+        # avoidance_node.py uses the filtered /robomaster_detection_node/people
+        # topic (published only when people ARE present), so it naturally gets a
+        # 0.5 s grace period via last_detection_time before any state is cleared.
+        # We replicate that behaviour here by doing nothing on empty/small frames
+        # and relying entirely on the _update_loop DETECTION_TIMEOUT (0.5 s) to
+        # expire stale detections.
         if not msg.people:
-            with self.lock:
-                # Only clear if not in a locked state
-                if self._state not in (PERSON_STATIONARY,):
-                    self._clear_detection()
-            return
+            return  # no update — let _update_loop timeout handle expiry
 
         # Pick the largest person in frame (most likely the one in the path)
         best_cx, max_area = 0.5, 0.0
@@ -104,10 +114,7 @@ class PeopleAvoidanceNode(Node):
                 best_cx = person.roi.x_offset + person.roi.width / 2.0
 
         if max_area < self.AREA_THRESHOLD:
-            with self.lock:
-                if self._state not in (PERSON_STATIONARY,):
-                    self._clear_detection()
-            return
+            return  # person too small — no update, let timeout clear if needed
 
         now = time.time()
         with self.lock:

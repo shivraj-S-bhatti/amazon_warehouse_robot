@@ -11,11 +11,11 @@ Adjust these values during testing on the real robot.
 # Dictionary: 4x4_50, marker size: ~8cm recommended
 
 OBJECT_MARKER_ID = 0            # Marker attached to the object at Point A
-WAYPOINT_MARKER_IDS = [1, 2, 3, 4]  # Markers along the route, in order
+WAYPOINT_MARKER_IDS = [1, 2, 4]  # Markers along the route, in order
 DEST_MARKER_ID = 10             # Marker at destination Point B
 
 ARUCO_DICT_TYPE = "DICT_4X4_50"  # Small dictionary, fast detection
-MARKER_SIZE = 0.32              # Physical marker side length in meters (8cm)
+MARKER_SIZE = 0.08              # Physical marker side length in meters (8cm)
 
 # =============================================================================
 # Camera Parameters
@@ -54,10 +54,10 @@ STATE_DONE = "DONE"
 # =============================================================================
 # Approach & Navigation Thresholds
 # =============================================================================
-APPROACH_DISTANCE = 0.60        # meters — stop this far from object marker
-WAYPOINT_SWITCH_DISTANCE = 0.60 # meters — close enough to switch to next waypoint
-DEST_APPROACH_DISTANCE = 0.60   # meters — stop this far from destination marker
-PERSON_BLOCK_AREA = 0.10        # min bounding-box area (fraction of frame) to trigger avoidance
+APPROACH_DISTANCE = 1.5        # meters — stop this far from object marker
+WAYPOINT_SWITCH_DISTANCE = 1.50 # meters — close enough to switch to next waypoint
+DEST_APPROACH_DISTANCE = 1.5   # meters — stop this far from destination marker
+PERSON_BLOCK_AREA = 0.25        # min bounding-box area (fraction of frame) to trigger avoidance
 BLIND_APPROACH_THRESHOLD = 0.30
 # If marker not detected for this many seconds, rotate to search
 MARKER_LOST_TIMEOUT = 3.0       # seconds
@@ -71,8 +71,8 @@ WAYPOINT_SEARCH_TIMEOUT = 15.0  # seconds
 TOF_TOPIC = "range_0"                # forward-facing ToF topic
 TOF_LEFT_TOPIC  = "range_1"         # left side ToF — verify with: ros2 topic list
 TOF_RIGHT_TOPIC = "range_2"         # right side ToF — verify with: ros2 topic list
-OBSTACLE_THRESHOLD = 0.50           # meters — trigger avoidance
-OBSTACLE_CLEAR_THRESHOLD = 0.80     # meters — safe to resume
+OBSTACLE_THRESHOLD = 0.40           # meters — trigger avoidance
+OBSTACLE_CLEAR_THRESHOLD = 0.60     # meters — safe to resume
 # During the U-detour forward leg, the side TOF on the obstacle side reads
 # short while the obstacle is beside the robot.  When it jumps above this
 # threshold the robot has moved past the obstacle and can strafe back.
