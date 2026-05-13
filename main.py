@@ -47,7 +47,7 @@ from config import (
     AVOID_TURN_SPEED,
     # U-shape detour around stationary obstacles
     DETOUR_STRAFE_SPEED, DETOUR_STRAFE_DURATION,
-    DETOUR_FORWARD_SPEED, DETOUR_FORWARD_DURATION,
+    DETOUR_FORWARD_SPEED, DETOUR_MIN_FORWARD_DURATION, DETOUR_FORWARD_DURATION,
     DETOUR_DEFAULT_DIR,
 )
 
@@ -520,7 +520,11 @@ class StateMachine:
             return STATE_OBSTACLE_AVOID
 
         if elapsed < p2_end:
-            if self._obstacle_cleared_for_strafe_back():
+            forward_elapsed = elapsed - p1_end
+            if (
+                forward_elapsed >= DETOUR_MIN_FORWARD_DURATION
+                and self._obstacle_cleared_for_strafe_back()
+            ):
                 self.detour_start_time = time.time() - (p2_end + 0.01)
                 return STATE_OBSTACLE_AVOID
 

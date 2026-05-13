@@ -174,6 +174,7 @@ AVOID_TURN_SPEED     = 0.4          # rad/s while sidestepping a moving person
 DETOUR_STRAFE_SPEED     = 0.18      # m/s lateral speed during strafe legs
 DETOUR_STRAFE_DURATION  = 1.8       # s   → ~0.32 m lateral offset
 DETOUR_FORWARD_SPEED    = 0.20      # m/s forward speed during middle leg
+DETOUR_MIN_FORWARD_DURATION = 1.2   # s   → must move forward before strafe-back
 # Safety timeout for the forward leg.  In practice the robot exits Phase 2
 # early once the obstacle is cleared (marker visible or person at frame edge).
 # This value is the hard upper bound so the robot doesn't drive forever if
