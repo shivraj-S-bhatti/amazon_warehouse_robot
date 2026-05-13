@@ -58,9 +58,11 @@ APPROACH_DISTANCE = 1.5        # meters — stop this far from object marker
 WAYPOINT_SWITCH_DISTANCE = 1.50 # meters — close enough to switch to next waypoint
 DEST_APPROACH_DISTANCE = 1.5   # meters — stop this far from destination marker
 PERSON_BLOCK_AREA = 0.25        # min bounding-box area (fraction of frame) to trigger avoidance
+PERSON_CENTER_BLOCK_HALF_WIDTH = 0.28  # central frame band treated as blocking the robot path
 BLIND_APPROACH_THRESHOLD = 0.30
 # If marker not detected for this many seconds, rotate to search
 MARKER_LOST_TIMEOUT = 3.0       # seconds
+REACQUIRE_TURN_TIME = 2.0       # seconds to bias search toward last-seen marker side
 
 # If a waypoint marker can't be found after rotating for this long, skip it
 WAYPOINT_SEARCH_TIMEOUT = 15.0  # seconds

@@ -34,6 +34,7 @@ from config import (
     # Thresholds
     APPROACH_DISTANCE, WAYPOINT_SWITCH_DISTANCE, DEST_APPROACH_DISTANCE,
     MARKER_LOST_TIMEOUT, WAYPOINT_SEARCH_TIMEOUT, PERSON_BLOCK_AREA,
+    PERSON_CENTER_BLOCK_HALF_WIDTH, REACQUIRE_TURN_TIME,
     BLIND_APPROACH_THRESHOLD, APPROACH_MIN_SPEED, MARKER_BLOCKED_THRESHOLD,
     RECENTER_YAW_THRESHOLD, RECENTER_YAW_SPEED,
     RECENTER_STRAFE_THRESHOLD, RECENTER_STRAFE_SPEED, RECENTER_SETTLED_COUNT,
@@ -94,6 +95,9 @@ class StateMachine:
 
         self.detour_direction = DETOUR_DEFAULT_DIR
         self.detour_start_time = 0.0
+        self._last_marker_hint = {}
+        self._search_sweep_direction = 1.0
+        self._search_sweep_last_flip = time.time()
 
         # Start with strafe so the robot slides back to the initial line
         self._recenter_phase   = 'strafe'
@@ -108,30 +112,55 @@ class StateMachine:
         except Exception:
             pass
 
+    def _remember_marker(self, marker_id: int, detection):
+        self._last_marker_hint[marker_id] = {
+            'time': time.time(),
+            'horizontal_error': detection.get('horizontal_error', 0.0),
+            'distance': detection.get('distance', float('inf')),
+        }
+
+    def _search_rotation_for_marker(self, marker_id: int) -> float:
+        now = time.time()
+        hint = self._last_marker_hint.get(marker_id)
+        if hint is not None and now - hint['time'] <= MARKER_LOST_TIMEOUT + REACQUIRE_TURN_TIME:
+            h_err = hint.get('horizontal_error', 0.0)
+            if abs(h_err) > 0.03:
+                return -SEARCH_ROTATE_SPEED if h_err > 0.0 else SEARCH_ROTATE_SPEED
+
+        if now - self._search_sweep_last_flip > REACQUIRE_TURN_TIME:
+            self._search_sweep_direction *= -1.0
+            self._search_sweep_last_flip = now
+        return self._search_sweep_direction * SEARCH_ROTATE_SPEED
+
+    def _person_blocks_path(self) -> bool:
+        if not self.people.is_person_recently_detected(max_age=0.6):
+            return False
+
+        area = self.people.get_person_area()
+        if area < PERSON_BLOCK_AREA:
+            return False
+
+        cx = self.people.get_person_cx()
+        return abs(cx - 0.5) <= PERSON_CENTER_BLOCK_HALF_WIDTH
+
     def _try_obstacle_detour(self, resume_state: str, elapsed: float) -> str | None:
         if time.time() - self._post_detour_time < 6.0:
             return None
 
         tof_dist = self.obstacle.get_distance()
-        person_visible = self.people.is_person_visible()
-        obstacle_suspected = tof_dist < MARKER_BLOCKED_THRESHOLD or person_visible
+        tof_blocks = self.obstacle.is_sensor_active() and tof_dist < MARKER_BLOCKED_THRESHOLD
+        person_blocks = self._person_blocks_path()
 
-        if obstacle_suspected and elapsed >= 1.0:
-            if person_visible:
+        if (tof_blocks or person_blocks) and elapsed >= 1.0:
+            if person_blocks:
                 pcx = self.people.get_person_cx()
                 self.detour_direction = 1.0 if pcx > 0.5 else -1.0
             else:
                 self.detour_direction = DETOUR_DEFAULT_DIR
             self.logger.warn(
                 f'Marker lost with obstacle suspected '
-                f'(tof={tof_dist:.2f}m, person={person_visible}) — '
+                f'(tof={tof_dist:.2f}m, tof_blocks={tof_blocks}, person_blocks={person_blocks}) — '
                 f'U-detour {"LEFT" if self.detour_direction > 0 else "RIGHT"}'
-            )
-        elif not obstacle_suspected and elapsed >= 2.0:
-            self.detour_direction = DETOUR_DEFAULT_DIR
-            self.logger.warn(
-                f'Marker lost {elapsed:.1f}s with no sensor evidence of obstacle — '
-                f'blind U-detour fallback (MOVING-person dodge or off-axis TOF)'
             )
         else:
             return None
@@ -198,13 +227,14 @@ class StateMachine:
         detection = self.vision.get_marker(OBJECT_MARKER_ID)
 
         if detection is not None:
+            self._remember_marker(OBJECT_MARKER_ID, detection)
             self.chassis.stop()
             time.sleep(1.0)
             self.marker_last_seen_time = time.time()
             self.last_dist = detection['distance']
             return STATE_APPROACH_OBJECT
 
-        self.chassis.rotate(SEARCH_ROTATE_SPEED)
+        self.chassis.rotate(self._search_rotation_for_marker(OBJECT_MARKER_ID))
         return STATE_SEARCH_OBJECT
 
     def handle_approach_object(self):
@@ -239,6 +269,7 @@ class StateMachine:
             self.chassis.stop()
             return STATE_SEARCH_OBJECT
 
+        self._remember_marker(OBJECT_MARKER_ID, detection)
         self.last_dist = detection['distance']
         self.marker_last_seen_time = time.time()
 
@@ -253,8 +284,9 @@ class StateMachine:
 
         person_state = self.people.get_state()
         person_area  = self.people.get_person_area()
+        person_blocks = self._person_blocks_path()
 
-        if person_state == PERSON_MOVING and person_area >= PERSON_BLOCK_AREA:
+        if person_blocks and person_state == PERSON_MOVING and person_area >= PERSON_BLOCK_AREA:
             vel       = self.people.get_smoothed_velocity()
             person_cx = self.people.get_person_cx()
             if abs(vel) > 0.06:
@@ -266,7 +298,7 @@ class StateMachine:
             self.logger.info(f'Moving person (cx={person_cx:.2f}, vel={vel:+.3f}) — turning {"left" if angular_z > 0 else "right"}')
             return STATE_APPROACH_OBJECT
 
-        if person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
+        if person_blocks and person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
             person_cx = self.people.get_person_cx()
             self.detour_direction = 1.0 if person_cx > 0.5 else -1.0
             self.chassis.stop()
@@ -342,6 +374,7 @@ class StateMachine:
         dest_detection = self.vision.get_marker(DEST_MARKER_ID)
         if dest_detection is not None:
             self.logger.info('Destination marker visible — skipping remaining waypoints')
+            self._remember_marker(DEST_MARKER_ID, dest_detection)
             self.chassis.stop()
             self.marker_last_seen_time = time.time()
             return STATE_APPROACH_DEST
@@ -373,10 +406,11 @@ class StateMachine:
                 self.marker_last_seen_time = 0.0 # Force instant search for next
                 return STATE_NAVIGATE
 
-            self.chassis.rotate(SEARCH_ROTATE_SPEED)
+            self.chassis.rotate(self._search_rotation_for_marker(current_marker_id))
             return STATE_NAVIGATE
 
         # ── If we reach here, marker IS visible ──
+        self._remember_marker(current_marker_id, detection)
         self.marker_last_seen_time = time.time()
         self.waypoint_search_start = None
 
@@ -393,8 +427,9 @@ class StateMachine:
 
         person_state = self.people.get_state()
         person_area  = self.people.get_person_area()
+        person_blocks = self._person_blocks_path()
 
-        if person_state == PERSON_MOVING and person_area >= PERSON_BLOCK_AREA:
+        if person_blocks and person_state == PERSON_MOVING and person_area >= PERSON_BLOCK_AREA:
             vel       = self.people.get_smoothed_velocity()
             person_cx = self.people.get_person_cx()
             if abs(vel) > 0.06:
@@ -405,7 +440,7 @@ class StateMachine:
             self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=angular_z)
             return STATE_NAVIGATE
 
-        if person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
+        if person_blocks and person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
             person_cx = self.people.get_person_cx()
             self.detour_direction = 1.0 if person_cx > 0.5 else -1.0
             self.chassis.stop()
@@ -518,13 +553,14 @@ class StateMachine:
         detection = self.vision.get_marker(DEST_MARKER_ID)
 
         if detection is not None:
+            self._remember_marker(DEST_MARKER_ID, detection)
             self.chassis.stop()
             time.sleep(1.0)
             self.marker_last_seen_time = time.time()
             self.last_dest_dist = detection['distance']
             return STATE_APPROACH_DEST
 
-        self.chassis.rotate(SEARCH_ROTATE_SPEED)
+        self.chassis.rotate(self._search_rotation_for_marker(DEST_MARKER_ID))
         return STATE_SEARCH_DEST
 
     def handle_approach_dest(self):
@@ -556,6 +592,7 @@ class StateMachine:
             self.chassis.stop()
             return STATE_SEARCH_DEST
 
+        self._remember_marker(DEST_MARKER_ID, detection)
         self.last_dest_dist = detection['distance']
         self.marker_last_seen_time = time.time()
 
@@ -582,8 +619,9 @@ class StateMachine:
 
         person_state = self.people.get_state()
         person_area  = self.people.get_person_area()
+        person_blocks = self._person_blocks_path()
 
-        if person_state == PERSON_MOVING and person_area >= PERSON_BLOCK_AREA:
+        if person_blocks and person_state == PERSON_MOVING and person_area >= PERSON_BLOCK_AREA:
             vel       = self.people.get_smoothed_velocity()
             person_cx = self.people.get_person_cx()
             if abs(vel) > 0.06:
@@ -594,7 +632,7 @@ class StateMachine:
             self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=angular_z)
             return STATE_APPROACH_DEST
 
-        if person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
+        if person_blocks and person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
             person_cx = self.people.get_person_cx()
             self.detour_direction = 1.0 if person_cx > 0.5 else -1.0
             self.chassis.stop()
