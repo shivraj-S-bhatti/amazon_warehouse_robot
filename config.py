@@ -11,7 +11,7 @@ Adjust these values during testing on the real robot.
 # Dictionary: 4x4_50, marker size: ~8cm recommended
 
 OBJECT_MARKER_ID = 0            # Marker attached to the object at Point A
-WAYPOINT_MARKER_IDS = [1, 2, 4]  # Markers along the route, in order
+WAYPOINT_MARKER_IDS = [1]  # Markers along the route, in order
 DEST_MARKER_ID = 10             # Marker at destination Point B
 
 ARUCO_DICT_TYPE = "DICT_4X4_50"  # Small dictionary, fast detection
@@ -54,16 +54,16 @@ STATE_DONE = "DONE"
 # =============================================================================
 # Approach & Navigation Thresholds
 # =============================================================================
-APPROACH_DISTANCE = 1.5        # meters — stop this far from object marker
-WAYPOINT_SWITCH_DISTANCE = 1.50 # meters — close enough to switch to next waypoint
-DEST_APPROACH_DISTANCE = 1.5   # meters — stop this far from destination marker
+APPROACH_DISTANCE = 0.5        # meters — stop this far from object marker
+WAYPOINT_SWITCH_DISTANCE = 0.50 # meters — close enough to switch to next waypoint
+DEST_APPROACH_DISTANCE = 0.5   # meters — stop this far from destination marker
 PERSON_BLOCK_AREA = 0.25        # min bounding-box area (fraction of frame) to trigger avoidance
 BLIND_APPROACH_THRESHOLD = 0.30
 # If marker not detected for this many seconds, rotate to search
 MARKER_LOST_TIMEOUT = 3.0       # seconds
 
 # If a waypoint marker can't be found after rotating for this long, skip it
-WAYPOINT_SEARCH_TIMEOUT = 15.0  # seconds
+WAYPOINT_SEARCH_TIMEOUT = 30.0  # seconds
 
 # =============================================================================
 # Obstacle Avoidance (ToF Sensor)
@@ -71,8 +71,8 @@ WAYPOINT_SEARCH_TIMEOUT = 15.0  # seconds
 TOF_TOPIC = "range_0"                # forward-facing ToF topic
 TOF_LEFT_TOPIC  = "range_1"         # left side ToF — verify with: ros2 topic list
 TOF_RIGHT_TOPIC = "range_2"         # right side ToF — verify with: ros2 topic list
-OBSTACLE_THRESHOLD = 0.40           # meters — trigger avoidance
-OBSTACLE_CLEAR_THRESHOLD = 0.60     # meters — safe to resume
+OBSTACLE_THRESHOLD = 0.25           # meters — trigger avoidance
+OBSTACLE_CLEAR_THRESHOLD = 0.4     # meters — safe to resume
 # During the U-detour forward leg, the side TOF on the obstacle side reads
 # short while the obstacle is beside the robot.  When it jumps above this
 # threshold the robot has moved past the obstacle and can strafe back.
@@ -114,7 +114,7 @@ ARM_PICK_X = 0.15                  # forward reach for picking
 ARM_PICK_Z = 0.10             # absolute height floor (hardware limit)
 ARM_PICK_LOWER = 0.10           # relative drop from floor to reach object (negative = down)
 ARM_CARRY_X = 0.09                 # forward position while carrying
-ARM_CARRY_Z = 0.07                 # lifted height while carrying (match retract to keep camera level)
+ARM_CARRY_Z = 0.11                 # lifted height while carrying (match retract to keep camera level)
 ARM_PLACE_X = 0.18                 # forward reach for placing
 ARM_PLACE_Z = 0.05                 # height for placing
 ARM_RETRACT_X = 0.09               # retracted position
@@ -176,7 +176,7 @@ DETOUR_FORWARD_SPEED    = 0.20      # m/s forward speed during middle leg
 # early once the obstacle is cleared (marker visible or person at frame edge).
 # This value is the hard upper bound so the robot doesn't drive forever if
 # neither sensor signal fires.
-DETOUR_FORWARD_DURATION = 5.0       # s   (was 2.5 — dynamic exit now handles early stop)
+DETOUR_FORWARD_DURATION = 7.5       # s   (was 2.5 — dynamic exit now handles early stop)
 DETOUR_DEFAULT_DIR      = 1.0       # +1 = detour LEFT, -1 = detour RIGHT
                                     # (used when obstacle side is unknown,
                                     #  e.g. a ToF-only detection)
@@ -187,7 +187,7 @@ DETOUR_DEFAULT_DIR      = 1.0       # +1 = detour LEFT, -1 = detour RIGHT
 #   If horizontal_error > RECENTER_YAW_THRESHOLD the robot is too far off-axis
 #   to strafe efficiently.  Rotate slowly in-place until the marker is roughly
 #   centred (robot is now squarely facing the marker plane).
-RECENTER_YAW_THRESHOLD = 0.20      # horizontal_error (tx/tz) — ~11° off-axis
+RECENTER_YAW_THRESHOLD = 0.10      # horizontal_error (tx/tz) — ~11° off-axis
 RECENTER_YAW_SPEED     = 0.12      # rad/s — slow enough not to overshoot
 
 # Phase 2 — STRAFE:

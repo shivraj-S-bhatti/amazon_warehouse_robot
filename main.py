@@ -5,17 +5,6 @@ main.py — Main state machine for the pick-and-transport project.
 Coordinates vision, obstacle avoidance, chassis control, and arm control
 to pick up an object at Point A, navigate through waypoints while avoiding
 obstacles, and place the object at Point B.
-
-Usage:
-    # Terminal 1: Launch the driver
-    source ~/robomaster_ws/install/setup.bash
-    ros2 launch robomaster_ros main.launch model:=ep conn_type:=ap \
-      --ros-args --params-file ~/robomaster_ws/config.yaml
-
-    # Terminal 2: Run this script
-    source ~/robomaster_ws/install/setup.bash
-    cd ~/robomaster_ws/my_project
-    python3 main.py
 """
 import sys
 import rclpy
@@ -25,29 +14,19 @@ import time
 import signal
 
 from config import (
-    # States
     STATE_SEARCH_OBJECT, STATE_APPROACH_OBJECT, STATE_PICK_UP,
     STATE_NAVIGATE, STATE_OBSTACLE_AVOID, STATE_BYPASS_OBSTACLE,
     STATE_SEARCH_DEST, STATE_APPROACH_DEST, STATE_PLACE, STATE_DONE,
-    # Marker IDs
     OBJECT_MARKER_ID, WAYPOINT_MARKER_IDS, DEST_MARKER_ID,
-    # Thresholds
     APPROACH_DISTANCE, WAYPOINT_SWITCH_DISTANCE, DEST_APPROACH_DISTANCE,
     MARKER_LOST_TIMEOUT, WAYPOINT_SEARCH_TIMEOUT, PERSON_BLOCK_AREA,
     BLIND_APPROACH_THRESHOLD, APPROACH_MIN_SPEED, MARKER_BLOCKED_THRESHOLD,
     RECENTER_YAW_THRESHOLD, RECENTER_YAW_SPEED,
     RECENTER_STRAFE_THRESHOLD, RECENTER_STRAFE_SPEED, RECENTER_SETTLED_COUNT,
-    # Speeds
-    SEARCH_ROTATE_SPEED,
-    # Timing
-    CONTROL_LOOP_RATE,
-    # Moving-person avoidance (in-place steering)
-    BYPASS_FORWARD_SPEED, BYPASS_TURN_SPEED,
-    AVOID_TURN_SPEED,
-    # U-shape detour around stationary obstacles
+    SEARCH_ROTATE_SPEED, CONTROL_LOOP_RATE,
+    BYPASS_FORWARD_SPEED, BYPASS_TURN_SPEED, AVOID_TURN_SPEED,
     DETOUR_STRAFE_SPEED, DETOUR_STRAFE_DURATION,
-    DETOUR_FORWARD_SPEED, DETOUR_FORWARD_DURATION,
-    DETOUR_DEFAULT_DIR,
+    DETOUR_FORWARD_SPEED, DETOUR_FORWARD_DURATION, DETOUR_DEFAULT_DIR,
 )
 
 from vision import VisionNode
@@ -58,31 +37,23 @@ from people_avoidance import PeopleAvoidanceNode, PERSON_MOVING, PERSON_STATIONA
 
 
 class StateMachine:
-    """
-    Main state machine that orchestrates the pick-and-transport task.
-    """
 
     def __init__(self):
-        # ── Create all nodes ──
         self.vision = VisionNode()
         self.obstacle = ObstacleNode()
         self.chassis = ChassisController()
         self.arm = ArmController()
         self.people = PeopleAvoidanceNode()
 
-        # ── Background executor for nodes needing callback processing ──
         self.executor = MultiThreadedExecutor(num_threads=4)
         self.executor.add_node(self.vision)
         self.executor.add_node(self.obstacle)
         self.executor.add_node(self.chassis)
         self.executor.add_node(self.people)
 
-        # Start background spinning
-        self.spin_thread = threading.Thread(
-            target=self._spin_executor, daemon=True)
+        self.spin_thread = threading.Thread(target=self._spin_executor, daemon=True)
         self.spin_thread.start()
 
-        # ── State machine variables ──
         self.state = STATE_SEARCH_OBJECT
         self.current_waypoint_index = 0
         self.marker_last_seen_time = time.time()
@@ -95,8 +66,8 @@ class StateMachine:
         self.detour_direction = DETOUR_DEFAULT_DIR
         self.detour_start_time = 0.0
 
-        # Start with strafe so the robot slides back to the initial line
-        self._recenter_phase   = 'strafe'
+        # FIX 1: Revert default to YAW first so it pivots to face waypoints
+        self._recenter_phase   = 'yaw'
         self._recenter_settled = 0
 
         self._post_detour_time = 0.0
@@ -142,15 +113,30 @@ class StateMachine:
         return STATE_OBSTACLE_AVOID
 
     def _reset_recenter(self):
-        # Always default back to strafe first to ensure lateral return
-        self._recenter_phase   = 'strafe'
+        # FIX 1: Always reset to yaw first
+        self._recenter_phase   = 'yaw'
         self._recenter_settled = 0
 
     def _apply_recenter(self, detection) -> bool:
         err = detection['horizontal_error']
 
-        # ── Phase 1: STRAFE (Return to initial line) ─────────────────────────
-        # By strafing first, the robot slides laterally back onto the optical axis before driving
+        # ── Phase 1: YAW (Pivot to face the marker squarely) ──
+        if self._recenter_phase == 'yaw':
+            if abs(err) > RECENTER_YAW_THRESHOLD:
+                angular = -RECENTER_YAW_SPEED if err > 0 else RECENTER_YAW_SPEED
+                self.chassis.move(linear_x=0.0, linear_y=0.0, angular_z=angular)
+                self.logger.info(
+                    f'Recenter YAW:   h_err={err:+.5f}  '
+                    f'rotating {"right" if err > 0 else "left"} @ {RECENTER_YAW_SPEED} rad/s'
+                )
+                return False
+            
+            self.chassis.stop()
+            self._recenter_phase = 'strafe'
+            self.logger.info(f'Recenter YAW done (h_err={err:+.5f}) → entering STRAFE phase')
+            return False 
+
+        # ── Phase 2: STRAFE (Fine lateral alignment) ──
         if self._recenter_phase == 'strafe':
             if abs(err) > RECENTER_STRAFE_THRESHOLD:
                 self._recenter_settled = 0
@@ -165,22 +151,6 @@ class StateMachine:
                 )
                 return False
                 
-            self.chassis.stop()
-            self._recenter_phase = 'yaw'
-            self.logger.info(f'Recenter STRAFE done (h_err={err:+.5f}) → entering YAW phase')
-            return False 
-
-        # ── Phase 2: YAW (Fix heading) ───────────────────────────────────────
-        if self._recenter_phase == 'yaw':
-            if abs(err) > RECENTER_YAW_THRESHOLD:
-                angular = -RECENTER_YAW_SPEED if err > 0 else RECENTER_YAW_SPEED
-                self.chassis.move(linear_x=0.0, linear_y=0.0, angular_z=angular)
-                self.logger.info(
-                    f'Recenter YAW:   h_err={err:+.5f}  '
-                    f'rotating {"right" if err > 0 else "left"} @ {RECENTER_YAW_SPEED} rad/s'
-                )
-                return False
-            
             self._recenter_settled += 1
             self.chassis.stop()
             self.logger.info(
@@ -226,7 +196,6 @@ class StateMachine:
 
             elapsed = time.time() - self.marker_last_seen_time
 
-            # Safely check for obstacles only during the grace period
             if elapsed <= MARKER_LOST_TIMEOUT:
                 if elapsed > 1.0:
                     next_state = self._try_obstacle_detour(STATE_APPROACH_OBJECT, elapsed)
@@ -257,13 +226,12 @@ class StateMachine:
         if person_state == PERSON_MOVING and person_area >= PERSON_BLOCK_AREA:
             vel       = self.people.get_smoothed_velocity()
             person_cx = self.people.get_person_cx()
-            if abs(vel) > 0.06:
+            if abs(vel) > 0.03:
                 angular_z = AVOID_TURN_SPEED if vel > 0 else -AVOID_TURN_SPEED
             else:
                 angular_z = AVOID_TURN_SPEED if person_cx > 0.5 else -AVOID_TURN_SPEED
             self.accumulated_yaw += angular_z * dt
             self.chassis.move(linear_x=BYPASS_FORWARD_SPEED, angular_z=angular_z)
-            self.logger.info(f'Moving person (cx={person_cx:.2f}, vel={vel:+.3f}) — turning {"left" if angular_z > 0 else "right"}')
             return STATE_APPROACH_OBJECT
 
         if person_state == PERSON_STATIONARY and person_area >= PERSON_BLOCK_AREA:
@@ -315,14 +283,12 @@ class StateMachine:
 
         if success:
             self.logger.info('Pick-up successful! Backing away from pickup zone.')
-            # FIX: Back away from the pickup zone so we don't hit it when spinning
             self.chassis.move_backward(0.15)
             time.sleep(2.0)
             self.chassis.stop()
 
             self.logger.info('Starting navigation.')
             self.current_waypoint_index = 0
-            # FIX: Force immediate spin/search in handle_navigate
             self.marker_last_seen_time = 0.0
             return STATE_NAVIGATE
         else:
@@ -344,6 +310,7 @@ class StateMachine:
             self.logger.info('Destination marker visible — skipping remaining waypoints')
             self.chassis.stop()
             self.marker_last_seen_time = time.time()
+            self._reset_recenter()  # ensure yaw phase runs first for dest marker
             return STATE_APPROACH_DEST
 
         detection = self.vision.get_marker(current_marker_id)
@@ -352,7 +319,6 @@ class StateMachine:
             self._reset_recenter()
             elapsed = time.time() - self.marker_last_seen_time
 
-            # A. Grace period / Obstacle check (0s to 3s)
             if elapsed <= MARKER_LOST_TIMEOUT:
                 if elapsed > 1.0:
                     next_state = self._try_obstacle_detour(STATE_NAVIGATE, elapsed)
@@ -361,8 +327,6 @@ class StateMachine:
                 self.chassis.stop()
                 return STATE_NAVIGATE
 
-            # B. Searching (> 3s, or forced by 0.0)
-            # FIX: Robot will not trigger ToF detours while it is just spinning
             if self.waypoint_search_start is None:
                 self.waypoint_search_start = time.time()
                 self.logger.info(f'Waypoint {current_marker_id} lost — rotating to search')
@@ -370,23 +334,21 @@ class StateMachine:
                 self.logger.warn(f'Waypoint {current_marker_id} not found after timeout — skipping')
                 self.current_waypoint_index += 1
                 self.waypoint_search_start = None
-                self.marker_last_seen_time = 0.0 # Force instant search for next
+                self.marker_last_seen_time = 0.0
                 return STATE_NAVIGATE
 
             self.chassis.rotate(SEARCH_ROTATE_SPEED)
             return STATE_NAVIGATE
 
-        # ── If we reach here, marker IS visible ──
         self.marker_last_seen_time = time.time()
         self.waypoint_search_start = None
 
         if detection['distance'] < WAYPOINT_SWITCH_DISTANCE:
             self.logger.info(f'Waypoint {current_marker_id} reached')
             self.current_waypoint_index += 1
-            self.marker_last_seen_time = 0.0 # Force instant search for next
+            self.marker_last_seen_time = 0.0 
             return STATE_NAVIGATE
 
-        # ── 1. PEOPLE AVOIDANCE ──
         now = time.time()
         dt = now - self._people_loop_time
         self._people_loop_time = now
@@ -426,7 +388,6 @@ class StateMachine:
 
         self.accumulated_yaw = 0.0
 
-        # ── 2. TOF OBSTACLE CHECK ──
         if self.obstacle.is_blocked():
             tof = self.obstacle.get_distance()
             if tof < detection['distance'] - 0.10:
@@ -440,7 +401,6 @@ class StateMachine:
                 self.pre_avoid_state = STATE_NAVIGATE
                 return STATE_OBSTACLE_AVOID
 
-        # ── 3. STRAFE RECENTER then YAW & FORWARD APPROACH ──
         if not self._apply_recenter(detection):
             return STATE_NAVIGATE
         
@@ -485,9 +445,12 @@ class StateMachine:
             return STATE_OBSTACLE_AVOID
 
         if elapsed < p2_end:
-            if self._obstacle_cleared_for_strafe_back():
-                self.detour_start_time = time.time() - (p2_end + 0.01)
-                return STATE_OBSTACLE_AVOID
+            # FIX 2: Enforce minimum forward time before allowing vision to exit early
+            minimum_forward_time = DETOUR_FORWARD_DURATION * 0.5
+            if (elapsed - p1_end) > minimum_forward_time:
+                if self._obstacle_cleared_for_strafe_back():
+                    self.detour_start_time = time.time() - (p2_end + 0.01)
+                    return STATE_OBSTACLE_AVOID
 
             if self.obstacle.is_blocked():
                 self.logger.warn('Second obstacle mid-detour — extending the U')
@@ -522,6 +485,7 @@ class StateMachine:
             time.sleep(1.0)
             self.marker_last_seen_time = time.time()
             self.last_dest_dist = detection['distance']
+            self._reset_recenter()  # ensure yaw phase runs first for dest marker
             return STATE_APPROACH_DEST
 
         self.chassis.rotate(SEARCH_ROTATE_SPEED)
