@@ -83,7 +83,7 @@ Open **two terminals**, both with the workspace sourced (`source install/setup.b
 **Terminal 1 — launch the driver:**
 ```bash
 ros2 launch robomaster_ros main.launch model:=ep conn_type:=ap \
-  --ros-args --params-file ~/robomaster_ws/src/robomaster_ros/scripts/config.yaml
+  --ros-args --params-file ~/robomaster_ws/src/robomaster_ros/robomaster_ros/scripts/config.yaml
 ```
 OR
 
@@ -94,7 +94,7 @@ ros2 launch robomaster_ros main.launch model:=ep conn_type:=ap tof_0:=True visio
 
 **Terminal 2 — run the state machine:**
 ```bash
-cd ~/robomaster_ws/src/robomaster_ros/scripts
+cd ~/robomaster_ws/src/robomaster_ros/robomaster_ros/scripts
 python3 main.py
 ```
 
@@ -120,7 +120,7 @@ Physical side length must match `MARKER_SIZE` in `config.py` (default **8 cm**).
 Each module can be tested independently without running the full task.
 
 ```bash
-cd ~/robomaster_ws/src/robomaster_ros/scripts
+cd ~/robomaster_ws/src/robomaster_ros/robomaster_ros/scripts
 
 # Test camera + ArUco detection (hold a marker in front of the camera)
 python3 vision.py
@@ -139,7 +139,7 @@ python3 arm_control.py
 
 ## Configuration
 
-All tunable parameters live in [`config.py`](src/robomaster_ros/scripts/config.py). The most commonly adjusted values:
+All tunable parameters live in [`config.py`](src/robomaster_ros/robomaster_ros/scripts/config.py). The most commonly adjusted values:
 
 ```python
 # Approach distances
@@ -162,7 +162,7 @@ ARM_PLACE_X, ARM_PLACE_Z   = 0.18, 0.05   # lower to release
 ARM_RETRACT_X, ARM_RETRACT_Z = 0.09, 0.10 # safe idle position
 ```
 
-The driver's hardware enables are set in [`config.yaml`](src/robomaster_ros/scripts/config.yaml) — make sure `arm`, `gripper`, `camera`, and `tof` are all `enabled: true`.
+The driver's hardware enables are set in [`config.yaml`](src/robomaster_ros/robomaster_ros/scripts/config.yaml) — make sure `arm`, `gripper`, `camera`, and `tof` are all `enabled: true`.
 
 ---
 
@@ -187,18 +187,21 @@ The robot's LEDs communicate its current state at a glance:
 robomaster_ws/
 ├── src/
 │   └── robomaster_ros/
-│       └── scripts/
-│           ├── main.py              # FSM entry point — run this
-│           ├── config.py            # All tunable constants
-│           ├── config.yaml          # Driver hardware enable flags
-│           ├── vision.py            # ArUco detection + solvePnP
-│           ├── obstacle.py          # ToF sensor + debounce logic
-│           ├── people_avoidance.py  # EMA pedestrian classifier
-│           ├── chassis_control.py   # cmd_vel + LED control
-│           ├── arm_control.py       # pick / carry / place sequences
-│           └── arm_gripper_test.py  # Quick hardware sanity check
-├── root.tex                         # IEEE paper (Deliverable 4)
-└── README.md
+│       ├── robomaster_ros/          # Main python package
+│       │   ├── scripts/             # State machine and task logic
+│       │   │   ├── main.py          # FSM entry point — run this
+│       │   │   ├── config.py        # All tunable constants
+│       │   │   ├── config.yaml      # Driver hardware enable flags
+│       │   │   ├── vision.py        # ArUco detection + solvePnP
+│       │   │   ├── obstacle.py      # ToF sensor + debounce logic
+│       │   │   ├── people_avoidance.py 
+│       │   │   ├── chassis_control.py 
+│       │   │   ├── arm_control.py   
+│       │   │   ├── arm_gripper_test.py
+│       │   └── modules/             # Driver core modules
+│       ├── launch/                  # ROS 2 launch files
+│       ├── robomaster_msgs/         # Custom ROS 2 messages/actions
+│       └── robomaster_description/  # URDF and meshes
 ```
 
 ---
